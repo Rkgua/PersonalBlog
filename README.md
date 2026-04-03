@@ -5,15 +5,15 @@
 ---
 
 一个基于本地数据库笔记管理,支持从桌面传入你的md文档笔记展示方便个人复习
-你可以在md文档里面添加标题和分类,点击左侧目录可以展示你添加于此分类的笔记
-也支持按标题模糊查找你的笔记
-可以在nar的中添加个人的常用网站
-首页基本样式如图
-![alt text](./readme-image/image.png)
-支持从桌面传入md文档笔记 方便自己查看
-md文档中对你的文档处理是这样的"# 你的标题"紧接着"分类为"+你的分类 你可以在server\uploads\upload.js修改
-删除密码在"server\routes\posts.js"使用了correctPassword可以自己修改
-数据库连接在"server\config\database.js" 可以基于自己的配置自己修改
+
+- 你可以在md文档里面添加标题和分类,点击左侧目录可以展示你添加于此分类的笔记
+  也支持按标题模糊查找你的笔记
+- 可以在nar的中添加个人的常用网站
+- 首页基本样式如图
+  ![alt text](./readme-image/image.png)
+  > md文档中对你的文档处理是这样的"# 你的标题"紧接着"分类为"+你的分类,你可以在server\uploads\upload.js修改
+  > 删除密码在"server\routes\posts.js"使用了correctPassword可以自己修改
+  > 数据库连接在"server\config\database.js",也可以基于自己的配置自己修改
 
 ## 技术栈
 
