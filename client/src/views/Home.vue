@@ -108,9 +108,7 @@
       </div>
       <div class="modal-body">
         <input type="file" accept=".md,.markdown" @change="handleFileChange" />
-        <p class="tip">
-          支持 .md 格式，文件第一行作为标题，category:xxx 作为分类
-        </p>
+        <p class="tip">支持 .md 格式，"# 标题"作为标题，分类为:xxx 作为分类</p>
       </div>
       <div class="modal-footer">
         <button class="cancel-btn" @click="showUploadModal = false">

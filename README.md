@@ -11,6 +11,7 @@
 - 可以在nar的中添加个人的常用网站
 - 首页基本样式如图
   ![alt text](./readme-image/image.png)
+  ![alt text](./readme-image/imagetext.png)
   > md文档中对你的文档处理是这样的"# 你的标题"紧接着"分类为"+你的分类,你可以在server\uploads\upload.js修改
   > 删除密码在"server\routes\posts.js"使用了correctPassword可以自己修改
   > 数据库连接在"server\config\database.js",也可以基于自己的配置自己修改
