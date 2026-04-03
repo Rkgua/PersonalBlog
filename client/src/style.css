@@ -1,0 +1,21 @@
+:root {
+  --primary: #8bb174;
+  --light-bg: #f8f9fa;
+  --card-bg: #ffffff;
+  --border: #e0e0e0;
+  --text: #333;
+  --text-secondary: #666;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+  background-color: #f5f5f7;
+  color: var(--text);
+  line-height: 1.6;
+}
