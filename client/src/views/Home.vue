@@ -107,8 +107,15 @@
         <button class="close-btn" @click="showUploadModal = false">×</button>
       </div>
       <div class="modal-body">
-        <input type="file" accept=".md,.markdown" @change="handleFileChange" />
-        <p class="tip">支持 .md 格式，"# 标题"作为标题，分类为:xxx 作为分类</p>
+        <!-- 支持选择文件夹或多文件 -->
+        <input
+          type="file"
+          accept=".md,.markdown"
+          webkitdirectory
+          multiple
+          @change="handleFileChange"
+        />
+        <p class="tip">选择文件夹导入，文件夹名=分类，文件名=标题</p>
       </div>
       <div class="modal-footer">
         <button class="cancel-btn" @click="showUploadModal = false">
@@ -117,7 +124,7 @@
         <button
           class="submit-btn"
           @click="uploadFile"
-          :disabled="!selectedFile || uploading"
+          :disabled="!selectedFiles || uploading"
         >
           {{ uploading ? "导入中..." : "导入" }}
         </button>
@@ -199,10 +206,10 @@ const titleSearchQuery = ref("");
 const showUploadModal = ref(false);
 
 /**
- * selectedFile: 响应式变量
- * 用户选择的要上传的文件
+ * selectedFiles: 响应式变量
+ * 用户选择的要上传的文件（支持多个文件或文件夹）
  */
-const selectedFile = ref(null);
+const selectedFiles = ref(null);
 
 /**
  * uploading: 响应式布尔值
@@ -463,24 +470,25 @@ const fetchPosts = async () => {
  * handleFileChange: 文件选择处理
  *
  * 当用户选择文件后触发
- * 将文件对象存储到 selectedFile
+ * 将文件对象数组存储到 selectedFiles
+ * 支持选择文件夹（多个文件）
  *
  * @param {Event} event - input change 事件
  */
 const handleFileChange = (event) => {
-  // event.target.files[0] - 获取用户选择的第一个文件
-  selectedFile.value = event.target.files[0];
+  // event.target.files - 获取用户选择的所有文件
+  selectedFiles.value = event.target.files;
 };
 
 /**
  * uploadFile: 上传文件函数
  *
  * 将用户选择的 Markdown 文件上传到服务器
- * 服务器会自动解析并创建文章
+ * 文件夹名=分类，文件名=标题
  */
 const uploadFile = async () => {
   // 防御性检查：如果没有选择文件，直接返回
-  if (!selectedFile.value) return;
+  if (!selectedFiles.value || selectedFiles.value.length === 0) return;
 
   /**
    * FormData: Web API
@@ -489,12 +497,74 @@ const uploadFile = async () => {
    */
   const formData = new FormData();
 
+  // 从第一个文件的 webkitRelativePath 获取文件夹名
+  // 例如: "技术文章/vue3-教程.md" -> "技术文章"
+  let category = "未分类";
+  if (selectedFiles.value.length > 0) {
+    const firstFile = selectedFiles.value[0];
+    const relativePath = firstFile.webkitRelativePath;
+    console.log("[upload] Raw relativePath:", relativePath);
+    if (relativePath) {
+      // 循环解码直到无法再解码
+      let decodedPath = relativePath;
+      let lastPath = "";
+      let loopCount = 0;
+      while (decodedPath !== lastPath && loopCount < 5) {
+        lastPath = decodedPath;
+        try {
+          decodedPath = decodeURIComponent(decodedPath);
+        } catch (e) {
+          break;
+        }
+        loopCount++;
+      }
+      console.log("[upload] Decoded relativePath:", decodedPath);
+      // 获取文件夹路径的第一个部分作为分类名
+      const pathParts = decodedPath.split("/");
+      if (pathParts.length > 1) {
+        category = pathParts[0];
+      }
+      console.log("[upload] Category:", category);
+    }
+  }
+
   /**
    * append: 向 FormData 添加字段
-   * 'file': 字段名（后端根据这个字段名读取）
-   * selectedFile.value: 文件对象
+   * 'files': 文件对象
+   * 'filenames': 文件名列表（已解码），用 | 分隔（避免逗号问题）
+   * 'category': 文件夹名作为分类
    */
-  formData.append("file", selectedFile.value);
+  formData.append("category", category);
+
+  // 收集所有解码后的文件名
+  const filenames = [];
+  for (let i = 0; i < selectedFiles.value.length; i++) {
+    const file = selectedFiles.value[i];
+    formData.append("files", file);
+
+    // 从 webkitRelativePath 获取解码后的文件名
+    let decodedName = file.name;
+    if (file.webkitRelativePath) {
+      let decodedPath = file.webkitRelativePath;
+      let lastPath = "";
+      let loopCount = 0;
+      while (decodedPath !== lastPath && loopCount < 5) {
+        lastPath = decodedPath;
+        try {
+          decodedPath = decodeURIComponent(decodedPath);
+        } catch (e) {
+          break;
+        }
+        loopCount++;
+      }
+      const pathParts = decodedPath.split("/");
+      if (pathParts.length > 1) {
+        decodedName = pathParts[pathParts.length - 1];
+      }
+    }
+    filenames.push(decodedName);
+  }
+  formData.append("filenames", filenames.join("|"));
 
   // 标记开始上传
   uploading.value = true;
@@ -519,19 +589,20 @@ const uploadFile = async () => {
     );
 
     /**
-     * res.data.post: 后端返回的创建好的文章对象
+     * res.data.posts: 后端返回的文章对象数组
      *
      * unshift: 在数组开头添加元素
      * 将新文章添加到列表最前面（最新发布）
      */
-    if (res.data.post) {
-      posts.value.unshift(res.data.post);
+    const newPosts = res.data.posts || [];
+    if (newPosts.length > 0) {
+      posts.value = [...newPosts, ...posts.value];
 
       // 关闭弹窗
       showUploadModal.value = false;
 
       // 清空已选文件
-      selectedFile.value = null;
+      selectedFiles.value = null;
     }
   } catch (error) {
     console.error("上传失败", error);
