@@ -50,8 +50,7 @@
         <div class="post-header">
           <h2>{{ post.title }}</h2>
           <div class="post-meta">
-            {{ formatDate(post.createdAt) }} · 阅读时间
-            {{ Math.ceil(post.content.length / 500) }} 分钟
+            {{ formatDate(post.createdAt) }}
           </div>
         </div>
         <div class="post-body" v-html="post.content"></div>
@@ -59,7 +58,7 @@
           <span>标签：{{ post.category }}</span>
           <div class="post-actions">
             <a @click.prevent="confirmDelete(post)">删除</a>
-            <router-link :to="'/post/' + post._id">阅读全文 →</router-link>
+            <router-link :to="'/post/' + post._id">阅读全文</router-link>
           </div>
         </div>
       </article>
@@ -116,6 +115,15 @@
           @change="handleFileChange"
         />
         <p class="tip">选择文件夹导入，文件夹名=分类，文件名=标题</p>
+        <input
+          type="file"
+          accept=".md,.markdown"
+          webkitdirectory
+          multiple
+          @change="handleFileChange"
+        />
+        <!-- 在已有分类中选择 -->
+        <p class="tip">选择文件导入，记得选择你要添加进的分类,文件名=标题</p>
       </div>
       <div class="modal-footer">
         <button class="cancel-btn" @click="showUploadModal = false">
@@ -503,7 +511,9 @@ const uploadFile = async () => {
   if (selectedFiles.value.length > 0) {
     const firstFile = selectedFiles.value[0];
     const relativePath = firstFile.webkitRelativePath;
+
     console.log("[upload] Raw relativePath:", relativePath);
+
     if (relativePath) {
       // 循环解码直到无法再解码
       let decodedPath = relativePath;
@@ -518,12 +528,15 @@ const uploadFile = async () => {
         }
         loopCount++;
       }
+
       console.log("[upload] Decoded relativePath:", decodedPath);
+
       // 获取文件夹路径的第一个部分作为分类名
       const pathParts = decodedPath.split("/");
       if (pathParts.length > 1) {
         category = pathParts[0];
       }
+
       console.log("[upload] Category:", category);
     }
   }

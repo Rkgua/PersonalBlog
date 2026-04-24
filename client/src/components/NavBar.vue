@@ -10,6 +10,7 @@
     <slot name="action"></slot>
   </div>
 
+  <!-- 在此添加你常用的工具 -->
   <div class="nav-bar">
     <router-link to="/">首页</router-link>
     <a href="	https://js-web-runner.mereith.com" target="_blank">JS工具</a>

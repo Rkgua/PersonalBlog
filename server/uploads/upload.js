@@ -35,11 +35,8 @@ router.post("/", upload.array("files", 100), async (req, res) => {
 
     // 从请求体获取分类名（前端已解码）
     const category = req.body.category || "未分类";
-    console.log("[upload] Category:", category);
-
     // 获取前端传来的文件名列表（用 | 分隔）
     const filenames = (req.body.filenames || "").split("|");
-    console.log("[upload] Filenames:", filenames);
 
     const results = [];
 

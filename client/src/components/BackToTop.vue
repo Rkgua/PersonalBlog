@@ -8,7 +8,7 @@
     </svg>
   </button>
 </template>
-
+<!-- 回到顶部按钮 -->
 <script setup>
 import { ref, watch, onMounted, onUnmounted } from "vue";
 
@@ -49,7 +49,9 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  transition: transform 0.3s, opacity 0.3s;
+  transition:
+    transform 0.3s,
+    opacity 0.3s;
   z-index: 999;
 }
 
