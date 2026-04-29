@@ -10,6 +10,19 @@ const postSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
+  cue: {
+    type: String,
+    default: "",
+  },
+  summary: {
+    type: String,
+    default: "",
+  },
+  difficulty: {
+    type: String,
+    enum: ["频繁", "常见", "偶尔", "罕见", ""],
+    default: "",
+  },
   category: {
     type: String,
     required: true,

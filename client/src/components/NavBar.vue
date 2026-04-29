@@ -38,7 +38,7 @@ const props = defineProps({
  *
  * 'update:modelValue': v-model 语法糖，用于双向绑定
  */
-const emit = defineEmits(["update:modelValue"]);
+const emit = defineEmits(["update:modelValue", "title-search"]);
 
 /**
  * useRoute - Vue Router 钩子

@@ -46,26 +46,71 @@
 
       <div v-if="filteredPosts.length === 0 && !titleSearchQuery">暂无文章</div>
 
-      <article v-for="post in filteredPosts" :key="post._id" class="post-card">
-        <div class="post-header">
-          <h2>{{ post.title }}</h2>
-          <div class="post-meta">
-            {{ formatDate(post.createdAt) }}
-          </div>
+      <!-- 全选框 -->
+      <div v-if="filteredPosts.length > 0" class="select-all-bar">
+        <label class="checkbox-label">
+          <input
+            type="checkbox"
+            :checked="isAllSelected"
+            @change="toggleSelectAll"
+          />
+          <span>全选</span>
+        </label>
+        <span class="select-count">共 {{ filteredPosts.length }} 篇</span>
+      </div>
+
+      <article v-for="post in filteredPosts" :key="post._id" class="post-card" :class="{ 'is-selected': selectedPostIds.has(post._id) }">
+        <div class="post-check-col">
+          <input
+            type="checkbox"
+            :checked="selectedPostIds.has(post._id)"
+            @change="toggleSelect(post._id)"
+            class="post-checkbox"
+          />
         </div>
-        <div class="post-body" v-html="post.content"></div>
-        <div class="post-footer">
-          <span>标签：{{ post.category }}</span>
-          <div class="post-actions">
-            <a @click.prevent="confirmDelete(post)">删除</a>
-            <router-link :to="'/post/' + post._id">阅读全文</router-link>
+        <div class="post-content-col">
+          <div class="post-header">
+            <h2>
+              <router-link :to="'/post/' + post._id" class="title-link">{{ post.title }}</router-link>
+            </h2>
+            <div class="post-meta">
+              {{ formatDate(post.createdAt) }}
+            </div>
+          </div>
+          <!-- 移除内容预览 post-body -->
+          <div class="post-footer">
+            <div class="post-footer-left">
+              <span class="post-category">📂 {{ post.category }}</span>
+              <!-- 难度选择 -->
+              <span class="difficulty-group">
+                <span
+                  v-for="d in difficultyLevels"
+                  :key="d.label"
+                  :class="['diff-badge', d.class, { active: post.difficulty === d.label }]"
+                  :title="d.label"
+                  @click.prevent="updateDifficulty(post, d.label)"
+                >{{ d.label }}</span>
+              </span>
+            </div>
+            <div class="post-actions">
+              <a @click.prevent="confirmDelete(post)">删除</a>
+              <router-link :to="'/post/' + post._id">阅读全文</router-link>
+            </div>
           </div>
         </div>
       </article>
+
+      <!-- 批量操作栏 -->
+      <div v-if="selectedPostIds.size > 0" class="batch-bar">
+        <span class="batch-info">已选 {{ selectedPostIds.size }} 篇</span>
+        <button class="batch-move-btn" @click="showMoveModal = true">📂 移动</button>
+        <button class="batch-delete-btn" @click="confirmBatchDelete">删除所选</button>
+        <button class="batch-cancel-btn" @click="clearSelection">取消选择</button>
+      </div>
     </main>
   </div>
 
-  <!-- 删除确认弹窗 -->
+  <!-- 删除确认弹窗（支持单删和批量） -->
   <div
     v-if="showDeleteModal"
     class="modal-overlay"
@@ -77,11 +122,12 @@
         <button class="close-btn" @click="showDeleteModal = false">×</button>
       </div>
       <div class="modal-body">
-        <p>确定要删除文章 "{{ postToDelete?.title }}" 吗？</p>
+        <p v-if="isBatchDeleting">确定要删除所选 <strong>{{ selectedPostIds.size }}</strong> 篇文章吗？此操作不可恢复。</p>
+        <p v-else>确定要删除文章 "{{ postToDelete?.title }}" 吗？</p>
         <input
           type="password"
           v-model="deletePassword"
-          placeholder="请输入密码"
+          placeholder="请输入密码（默认：123456）"
         />
       </div>
       <div class="modal-footer">
@@ -95,46 +141,154 @@
     </div>
   </div>
 
+  <!-- 移动分类弹窗 -->
   <div
-    v-if="showUploadModal"
+    v-if="showMoveModal"
     class="modal-overlay"
-    @click.self="showUploadModal = false"
+    @click.self="showMoveModal = false"
   >
     <div class="modal">
       <div class="modal-header">
-        <h3>导入 Markdown 文章</h3>
-        <button class="close-btn" @click="showUploadModal = false">×</button>
+        <h3>移动文章到分类</h3>
+        <button class="close-btn" @click="showMoveModal = false">×</button>
       </div>
       <div class="modal-body">
-        <!-- 支持选择文件夹或多文件 -->
-        <input
-          type="file"
-          accept=".md,.markdown"
-          webkitdirectory
-          multiple
-          @change="handleFileChange"
-        />
-        <p class="tip">选择文件夹导入，文件夹名=分类，文件名=标题</p>
-        <input
-          type="file"
-          accept=".md,.markdown"
-          webkitdirectory
-          multiple
-          @change="handleFileChange"
-        />
-        <!-- 在已有分类中选择 -->
-        <p class="tip">选择文件导入，记得选择你要添加进的分类,文件名=标题</p>
+        <p>将所选 <strong>{{ selectedPostIds.size }}</strong> 篇文章移动到：</p>
+        <div class="move-category-row">
+          <select v-model="moveTargetCategory" class="category-select">
+            <option value="" disabled>请选择分类</option>
+            <option
+              v-for="cat in allCategoryNames"
+              :key="cat"
+              :value="cat"
+            >{{ cat }}</option>
+          </select>
+          <input
+            v-model="moveCustomCategory"
+            class="category-input"
+            placeholder="或输入新分类名"
+          />
+        </div>
       </div>
       <div class="modal-footer">
-        <button class="cancel-btn" @click="showUploadModal = false">
-          取消
-        </button>
+        <button class="cancel-btn" @click="showMoveModal = false">取消</button>
         <button
           class="submit-btn"
-          @click="uploadFile"
-          :disabled="!selectedFiles || uploading"
+          @click="executeBatchMove"
+          :disabled="!effectiveMoveCategory || moving"
         >
-          {{ uploading ? "导入中..." : "导入" }}
+          {{ moving ? "移动中..." : "确认移动" }}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 上传弹窗（支持拖拽 + 单文件选择分类） -->
+  <div
+    v-if="showUploadModal"
+    class="modal-overlay"
+    @click.self="closeUploadModal"
+  >
+    <div class="modal upload-modal">
+      <div class="modal-header">
+        <h3>导入 Markdown 文章</h3>
+        <button class="close-btn" @click="closeUploadModal">×</button>
+      </div>
+
+      <!-- Upload Tabs -->
+      <div class="upload-tabs">
+        <button
+          :class="['tab-btn', { active: uploadTab === 'folder' }]"
+          @click="uploadTab = 'folder'"
+        >📁 文件夹导入</button>
+        <button
+          :class="['tab-btn', { active: uploadTab === 'single' }]"
+          @click="uploadTab = 'single'"
+        >📄 单文件导入</button>
+      </div>
+
+      <div class="modal-body">
+        <!-- Tab 1: Folder Import with Drag & Drop -->
+        <div v-if="uploadTab === 'folder'">
+          <!-- Drag & drop zone -->
+          <div
+            class="drop-zone"
+            :class="{ 'drop-active': isDragging }"
+            @dragover.prevent="handleDragOver"
+            @dragleave="isDragging = false"
+            @drop.prevent="handleDrop"
+            @click="folderInputRef?.click()"
+          >
+            <div class="drop-icon">
+              <svg viewBox="0 0 24 24" width="48" height="48">
+                <path fill="currentColor" d="M20 6h-8l-2-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2z" />
+              </svg>
+            </div>
+            <p class="drop-text">
+              {{ selectedFolderName || '拖拽文件夹到此处，或点击选择文件夹' }}
+            </p>
+            <p class="tip">文件夹名=分类，.md文件名=文章标题，自动批量导入</p>
+            <input
+              ref="folderInputRef"
+              type="file"
+              accept=".md,.markdown"
+              webkitdirectory
+              multiple
+              hidden
+              @change="handleFolderChange"
+            />
+          </div>
+        </div>
+
+        <!-- Tab 2: Single File Import with Category Picker -->
+        <div v-if="uploadTab === 'single'">
+          <div class="single-upload-form">
+            <label class="form-label">选择 .md 文件</label>
+            <input
+              type="file"
+              accept=".md,.markdown"
+              @change="handleSingleFileChange"
+            />
+
+            <label class="form-label" style="margin-top: 12px; display: block;">选择分类</label>
+            <div class="category-select-row">
+              <select v-model="selectedCategoryForUpload" class="category-select">
+                <option value="未分类">未分类</option>
+                <option
+                  v-for="cat in existingCategories"
+                  :key="cat"
+                  :value="cat"
+                >{{ cat }}</option>
+              </select>
+              <input
+                v-model="customCategoryInput"
+                class="category-input"
+                placeholder="或输入新分类名"
+              />
+            </div>
+
+            <p class="tip" style="margin-top: 12px;">选择 .md 文件并指定分类导入，文件名=文章标题</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="cancel-btn" @click="closeUploadModal">取消</button>
+        <button
+          v-if="uploadTab === 'folder'"
+          class="submit-btn"
+          @click="uploadFolder"
+          :disabled="(!selectedFolderFiles && dragFilesCache.length === 0) || uploading"
+        >
+          {{ uploading ? "导入中..." : "导入文件夹" }}
+        </button>
+        <button
+          v-if="uploadTab === 'single'"
+          class="submit-btn"
+          @click="uploadSingleFile"
+          :disabled="!singleFile || uploading"
+        >
+          {{ uploading ? "导入中..." : "导入文件" }}
         </button>
       </div>
     </div>
@@ -214,10 +368,59 @@ const titleSearchQuery = ref("");
 const showUploadModal = ref(false);
 
 /**
- * selectedFiles: 响应式变量
- * 用户选择的要上传的文件（支持多个文件或文件夹）
+ * uploadTab: 上传弹窗的当前标签页
+ * 'folder' - 文件夹导入
+ * 'single' - 单文件导入
  */
-const selectedFiles = ref(null);
+const uploadTab = ref("folder");
+
+/**
+ * selectedFolderFiles: 响应式变量
+ * 用户通过文件夹选择的所有文件
+ */
+const selectedFolderFiles = ref(null);
+
+/**
+ * selectedFolderName: 响应式字符串
+ * 已选择的文件夹名称（用于显示）
+ */
+const selectedFolderName = ref("");
+
+/**
+ * folderInputRef: 模板引用
+ * 用于触发隐藏的 webkitdirectory input
+ */
+const folderInputRef = ref(null);
+
+/**
+ * isDragging: 响应式布尔值
+ * 标记当前是否拖拽悬停
+ */
+const isDragging = ref(false);
+
+/**
+ * singleFile: 响应式变量
+ * 用户选择的单个文件
+ */
+const singleFile = ref(null);
+
+/**
+ * selectedCategoryForUpload: 响应式字符串
+ * 单文件导入时手动选择的分类
+ */
+const selectedCategoryForUpload = ref("未分类");
+
+/**
+ * customCategoryInput: 响应式字符串
+ * 用户手动输入的新分类名
+ */
+const customCategoryInput = ref("");
+
+/**
+ * existingCategories: 响应式数组
+ * 从后端获取的已有分类列表
+ */
+const existingCategories = ref([]);
 
 /**
  * uploading: 响应式布尔值
@@ -248,6 +451,81 @@ const deletePassword = ref("");
  * 标记当前是否正在删除（用于禁用按钮）
  */
 const deleting = ref(false);
+
+/**
+ * selectedPostIds: 响应式 Set
+ * 存储用户选中的文章 ID（用于批量删除）
+ */
+const selectedPostIds = ref(new Set());
+
+/**
+ * isBatchDeleting: 响应式布尔值
+ * 标记当前删除弹窗是批量删除还是单篇删除
+ */
+const isBatchDeleting = ref(false);
+
+/**
+ * showMoveModal: 响应式布尔值
+ * 控制移动分类弹窗显示/隐藏
+ */
+const showMoveModal = ref(false);
+
+/**
+ * moveTargetCategory: 响应式字符串
+ * 移动目标分类（从下拉选择）
+ */
+const moveTargetCategory = ref("");
+
+/**
+ * moveCustomCategory: 响应式字符串
+ * 移动目标分类（手动输入新分类名）
+ */
+const moveCustomCategory = ref("");
+
+/**
+ * effectiveMoveCategory: 计算属性
+ * 最终有效的目标分类名
+ */
+const effectiveMoveCategory = computed(() => {
+  return moveCustomCategory.value.trim() || moveTargetCategory.value || "";
+});
+
+/**
+ * allCategoryNames: 计算属性
+ * 所有可选分类名（去掉「全部」）
+ */
+const allCategoryNames = computed(() => {
+  return categories.value.filter((c) => c !== "全部");
+});
+
+/**
+ * moving: 响应式布尔值
+ * 标记是否正在移动中
+ */
+const moving = ref(false);
+
+/**
+ * isAllSelected: 计算属性
+ * 当前过滤后的文章是否全部选中
+ */
+const isAllSelected = computed(() => {
+  if (filteredPosts.value.length === 0) return false;
+  return filteredPosts.value.every((p) => selectedPostIds.value.has(p._id));
+});
+
+/**
+ * closeUploadModal: 关闭上传弹窗并重置所有状态
+ */
+const closeUploadModal = () => {
+  showUploadModal.value = false;
+  selectedFolderFiles.value = null;
+  selectedFolderName.value = "";
+  dragFilesCache = [];
+  dragFolderNameCache = "";
+  singleFile.value = null;
+  selectedCategoryForUpload.value = "未分类";
+  customCategoryInput.value = "";
+};
 
 /**
  * categories: 计算属性
@@ -475,240 +753,464 @@ const fetchPosts = async () => {
 };
 
 /**
- * handleFileChange: 文件选择处理
+ * handleFolderChange: 文件夹选择处理
  *
- * 当用户选择文件后触发
- * 将文件对象数组存储到 selectedFiles
- * 支持选择文件夹（多个文件）
+ * 当用户选择文件夹后触发
+ * 将文件对象数组存储到 selectedFolderFiles
  *
  * @param {Event} event - input change 事件
  */
-const handleFileChange = (event) => {
-  // event.target.files - 获取用户选择的所有文件
-  selectedFiles.value = event.target.files;
+const handleFolderChange = (event) => {
+  // 清除拖拽缓存（用户手动选择文件夹时以文件夹选择为准）
+  dragFilesCache = [];
+  dragFolderNameCache = "";
+  selectedFolderFiles.value = event.target.files;
+  // 提取文件夹名作为显示名称
+  if (event.target.files.length > 0) {
+    const path = event.target.files[0].webkitRelativePath;
+    if (path) {
+      const parts = path.split("/");
+      selectedFolderName.value = "📁 " + parts[0] + " (" + event.target.files.length + " 个文件)";
+    }
+  }
 };
 
 /**
- * uploadFile: 上传文件函数
+ * handleSingleFileChange: 单文件选择处理
  *
- * 将用户选择的 Markdown 文件上传到服务器
- * 文件夹名=分类，文件名=标题
+ * @param {Event} event - input change 事件
  */
-const uploadFile = async () => {
-  // 防御性检查：如果没有选择文件，直接返回
-  if (!selectedFiles.value || selectedFiles.value.length === 0) return;
+const handleSingleFileChange = (event) => {
+  singleFile.value = event.target.files[0];
+};
 
-  /**
-   * FormData: Web API
-   * 用于构建multipart/form-data格式的请求体
-   * 必须用这种方式上传文件
-   */
-  const formData = new FormData();
+/**
+ * handleDragOver: 拖拽悬停处理
+ */
+const handleDragOver = (e) => {
+  isDragging.value = true;
+};
 
-  // 从第一个文件的 webkitRelativePath 获取文件夹名
-  // 例如: "技术文章/vue3-教程.md" -> "技术文章"
+/**
+ * dragFilesCache: 拖拽文件缓存（绕过 DataTransfer 内容丢失 bug）
+ * entry.file() 取出的 File 对象直接保存，不经过 new DataTransfer()
+ */
+let dragFilesCache = [];
+let dragFolderNameCache = "";
+
+/**
+ * handleDrop: 拖拽放下处理
+ *
+ * 从拖拽的数据中提取文件列表，直接缓存 File 对象
+ * 不经过 DataTransfer（会丢失文件内容和 webkitRelativePath）
+ *
+ * @param {DragEvent} e
+ */
+const handleDrop = (e) => {
+  isDragging.value = false;
+  const items = e.dataTransfer?.items;
+  if (!items) return;
+
+  dragFilesCache = [];
+  dragFolderNameCache = "";
+  const promises = [];
+  let topFolderName = "";
+
+  for (const item of items) {
+    const entry = item.webkitGetAsEntry ? item.webkitGetAsEntry() : null;
+    if (entry) {
+      // 记录顶级文件夹名
+      if (entry.isDirectory) {
+        topFolderName = entry.name;
+      }
+      promises.push(traverseEntry(entry, dragFilesCache, ""));
+    }
+  }
+
+  Promise.all(promises).then(() => {
+    if (dragFilesCache.length > 0) {
+      dragFolderNameCache = topFolderName || "未分类";
+      selectedFolderFiles.value = null; // 清除 FileList 引用，使用缓存
+      selectedFolderName.value = "📁 " + (topFolderName || "未分类") + " (" + dragFilesCache.length + " 个文件)";
+    } else {
+      selectedFolderName.value = "";
+    }
+  });
+};
+
+/**
+ * traverseEntry: 递归遍历拖拽的文件目录树
+ *
+ * @param {FileSystemEntry} entry
+ * @param {Array} allFiles - 存储 File 对象的数组
+ * @param {string} parentPath - 上级文件夹路径
+ * @returns {Promise}
+ */
+const traverseEntry = (entry, allFiles, parentPath) => {
+  return new Promise((resolve) => {
+    if (entry.isFile) {
+      entry.file((file) => {
+        // 仅添加 .md 文件（拖拽时直接过滤，不上传非 md 文件）
+        if (file.name.endsWith(".md") || file.name.endsWith(".markdown")) {
+          // 手动设置 webkitRelativePath 模拟文件输入行为
+          // 注意：entry.fullPath 包含完整路径如 /folder/sub/file.md
+          const fullPath = entry.fullPath || ("/" + parentPath + "/" + file.name).replace(/\/\//g, "/");
+          Object.defineProperty(file, "webkitRelativePath", {
+            value: fullPath.replace(/^\//, ""),
+            writable: false,
+          });
+          allFiles.push(file);
+        }
+        resolve();
+      }, resolve); // 如果 file() 出错也 resolve 防止死锁
+    } else if (entry.isDirectory) {
+      const reader = entry.createReader();
+      const dirPath = parentPath ? parentPath + "/" + entry.name : entry.name;
+      const readEntries = () => {
+        reader.readEntries((entries) => {
+          if (entries.length === 0) {
+            resolve();
+          } else {
+            const subPromises = entries.map((e) => traverseEntry(e, allFiles, dirPath));
+            Promise.all(subPromises).then(readEntries);
+          }
+        }, resolve); // 如果 readEntries 出错也 resolve
+      };
+      readEntries();
+    } else {
+      resolve();
+    }
+  });
+};
+
+/**
+ * resolveFiles: 获取当前要上传的文件列表（兼容 FileList 和拖拽缓存）
+ *
+ * @returns {{ files: Array, filenames: string[], category: string }}
+ */
+const resolveFiles = () => {
+  const useDrag = dragFilesCache.length > 0;
+  const sourceFiles = useDrag ? dragFilesCache : Array.from(selectedFolderFiles.value || []);
+
+  // 过滤出 .md 文件（跳过 size=0 的空文件）
+  const mdFiles = sourceFiles.filter((f) => {
+    const name = f.name || "";
+    if (f.size === 0) {
+      console.warn("[upload] Skipping empty file (frontend):", name);
+      return false;
+    }
+    return name.endsWith(".md") || name.endsWith(".markdown");
+  });
+
+  // 提取分类名
   let category = "未分类";
-  if (selectedFiles.value.length > 0) {
-    const firstFile = selectedFiles.value[0];
-    const relativePath = firstFile.webkitRelativePath;
-
-    console.log("[upload] Raw relativePath:", relativePath);
-
-    if (relativePath) {
-      // 循环解码直到无法再解码
-      let decodedPath = relativePath;
-      let lastPath = "";
-      let loopCount = 0;
-      while (decodedPath !== lastPath && loopCount < 5) {
-        lastPath = decodedPath;
-        try {
-          decodedPath = decodeURIComponent(decodedPath);
-        } catch (e) {
-          break;
-        }
-        loopCount++;
-      }
-
-      console.log("[upload] Decoded relativePath:", decodedPath);
-
-      // 获取文件夹路径的第一个部分作为分类名
-      const pathParts = decodedPath.split("/");
-      if (pathParts.length > 1) {
-        category = pathParts[0];
-      }
-
-      console.log("[upload] Category:", category);
+  if (useDrag && dragFolderNameCache) {
+    category = dragFolderNameCache;
+  } else if (mdFiles.length > 0 && mdFiles[0].webkitRelativePath) {
+    let decodedPath = mdFiles[0].webkitRelativePath;
+    let lastPath = "";
+    let loopCount = 0;
+    while (decodedPath !== lastPath && loopCount < 5) {
+      lastPath = decodedPath;
+      try { decodedPath = decodeURIComponent(decodedPath); } catch (e) { break; }
+      loopCount++;
     }
+    const parts = decodedPath.split("/");
+    category = parts.length > 1 ? parts[0] : "未分类";
   }
 
-  /**
-   * append: 向 FormData 添加字段
-   * 'files': 文件对象
-   * 'filenames': 文件名列表（已解码），用 | 分隔（避免逗号问题）
-   * 'category': 文件夹名作为分类
-   */
+  // 提取解码后的文件名
+  const filenames = mdFiles.map((f) => {
+    if (!f.webkitRelativePath) return f.name;
+    let decodedPath = f.webkitRelativePath;
+    let lastPath = "";
+    let loopCount = 0;
+    while (decodedPath !== lastPath && loopCount < 5) {
+      lastPath = decodedPath;
+      try { decodedPath = decodeURIComponent(decodedPath); } catch (e) { break; }
+      loopCount++;
+    }
+    const parts = decodedPath.split("/");
+    return parts.length > 1 ? parts[parts.length - 1] : f.name;
+  });
+
+  return { files: mdFiles, filenames, category };
+};
+
+/**
+ * uploadFolder: 上传整个文件夹
+ *
+ * 文件夹名=分类，文件名=标题
+ * 支持 webkitdirectory 文件输入和拖拽两种来源
+ */
+const uploadFolder = async () => {
+  const useDrag = dragFilesCache.length > 0;
+  const hasInputFiles = selectedFolderFiles.value && selectedFolderFiles.value.length > 0;
+
+  if (!useDrag && !hasInputFiles) return;
+
+  const { files, filenames, category } = resolveFiles();
+  if (files.length === 0) {
+    alert("未找到 .md 文件");
+    return;
+  }
+
+  const formData = new FormData();
   formData.append("category", category);
+  // 发送预期文件数，后端可检测是否有文件丢失
+  formData.append("expectedCount", String(files.length));
 
-  // 收集所有解码后的文件名
-  const filenames = [];
-  for (let i = 0; i < selectedFiles.value.length; i++) {
-    const file = selectedFiles.value[i];
+  // 只上传 .md 文件
+  for (const file of files) {
     formData.append("files", file);
-
-    // 从 webkitRelativePath 获取解码后的文件名
-    let decodedName = file.name;
-    if (file.webkitRelativePath) {
-      let decodedPath = file.webkitRelativePath;
-      let lastPath = "";
-      let loopCount = 0;
-      while (decodedPath !== lastPath && loopCount < 5) {
-        lastPath = decodedPath;
-        try {
-          decodedPath = decodeURIComponent(decodedPath);
-        } catch (e) {
-          break;
-        }
-        loopCount++;
-      }
-      const pathParts = decodedPath.split("/");
-      if (pathParts.length > 1) {
-        decodedName = pathParts[pathParts.length - 1];
-      }
-    }
-    filenames.push(decodedName);
   }
-  formData.append("filenames", filenames.join("|"));
+  // 使用 JSON 数组传递文件名（避免 pipe 分隔符冲突）
+  formData.append("filenames", JSON.stringify(filenames));
 
-  // 标记开始上传
   uploading.value = true;
 
   try {
-    /**
-     * axios.post: 发送 POST 请求
-     *
-     * 参数1: URL
-     * 参数2: 请求体数据
-     * 参数3: 配置对象
-     *   - headers: 设置请求头
-     *   - Content-Type: multipart/form-data
-     *     告诉服务器这是文件上传请求
-     */
-    const res = await axios.post(
-      "http://localhost:5000/api/upload/",
-      formData,
-      {
-        headers: { "Content-Type": "multipart/form-data" },
-      },
-    );
+    // 注意：不要手动设置 Content-Type，axios 会自动添加 multipart boundary
+    const res = await axios.post("http://localhost:5000/api/upload/", formData);
 
-    /**
-     * res.data.posts: 后端返回的文章对象数组
-     *
-     * unshift: 在数组开头添加元素
-     * 将新文章添加到列表最前面（最新发布）
-     */
+    const diag = res.data._diagnostics;
     const newPosts = res.data.posts || [];
+
+    // 检查文件数不匹配并警告
+    if (diag) {
+      console.log(`[upload] 期望 ${diag.expected} 个文件，服务端收到 ${diag.received}，成功导入 ${diag.imported}`);
+      if (diag.received < diag.expected) {
+        alert(`警告：预期 ${diag.expected} 个文件，服务端仅收到 ${diag.received} 个。\n这通常是因为浏览器拖拽上传时部分文件内容丢失。\n建议改用「选择文件夹」方式导入。`);
+      } else if (diag.imported < diag.received) {
+        console.warn(`[upload] ${diag.skipped} 个文件被跳过（空文件或内容异常）`);
+      }
+    }
+
     if (newPosts.length > 0) {
       posts.value = [...newPosts, ...posts.value];
-
-      // 关闭弹窗
       showUploadModal.value = false;
-
-      // 清空已选文件
-      selectedFiles.value = null;
+      selectedFolderFiles.value = null;
+      selectedFolderName.value = "";
+      dragFilesCache = [];
+      dragFolderNameCache = "";
     }
   } catch (error) {
     console.error("上传失败", error);
-
-    /**
-     * error.response?.data?.message
-     * - error.response: 服务器响应对象
-     * - error.response.data: 响应数据
-     * - error.response.data.message: 后端返回的错误信息
-     * - error.message: axios 错误信息（如网络错误）
-     * - ?. 是可选链操作符，避免访问undefined属性报错
-     *
-     * 优先显示后端错误信息，其次显示axios错误
-     */
     alert("上传失败: " + (error.response?.data?.message || error.message));
   } finally {
-    /**
-     * finally: 无论try还是catch，都会执行
-     * 用于：清理工作，如重置loading状态
-     */
     uploading.value = false;
   }
 };
 
 /**
- * confirmDelete: 确认删除
+ * uploadSingleFile: 上传单个文件
  *
- * 打开删除确认弹窗
- * 重置密码输入和删除状态
- *
- * @param {Object} post - 要删除的文章对象
+ * 使用手动选择的分类
  */
-const confirmDelete = (post) => {
-  // 保存要删除的文章
-  postToDelete.value = post;
+const uploadSingleFile = async () => {
+  if (!singleFile.value) return;
 
-  // 重置密码
+  const formData = new FormData();
+  const category = customCategoryInput.value.trim() || selectedCategoryForUpload.value || "未分类";
+  formData.append("category", category);
+  // 用 file.name 作为标题（File API 的 name 是正确 UTF-8，不受 multipart 编码影响）
+  formData.append("title", singleFile.value.name.replace(/\.(md|markdown)$/i, ""));
+  formData.append("file", singleFile.value);
+
+  uploading.value = true;
+
+  try {
+    // 注意：不要手动设置 Content-Type，axios 会自动添加 multipart boundary
+    const res = await axios.post("http://localhost:5000/api/upload/single", formData);
+
+    if (res.data.post) {
+      posts.value = [res.data.post, ...posts.value];
+      showUploadModal.value = false;
+      singleFile.value = null;
+      selectedCategoryForUpload.value = "未分类";
+      customCategoryInput.value = "";
+    }
+  } catch (error) {
+    console.error("上传失败", error);
+    alert("上传失败: " + (error.response?.data?.message || error.message));
+  } finally {
+    uploading.value = false;
+  }
+};
+
+/**
+ * fetchCategories: 从后端获取已有分类列表
+ */
+const fetchCategories = async () => {
+  try {
+    const res = await axios.get("http://localhost:5000/api/posts/categories");
+    existingCategories.value = res.data || [];
+  } catch (error) {
+    console.error("获取分类失败", error);
+  }
+};
+
+/**
+ * difficultyLevels: 难度等级配置
+ * 用于文章卡片上的难度选择标签
+ */
+const difficultyLevels = [
+  { label: "频繁", class: "diff-frequent", color: "#e74c3c" },
+  { label: "常见", class: "diff-common", color: "#e67e22" },
+  { label: "偶尔", class: "diff-occasional", color: "#27ae60" },
+  { label: "罕见", class: "diff-rare", color: "#2980b9" },
+];
+
+/**
+ * updateDifficulty: 更新文章难度
+ *
+ * @param {Object} post - 文章对象
+ * @param {string} difficulty - 难度值
+ */
+const updateDifficulty = async (post, difficulty) => {
+  // 如果点击已选中的难度，则取消选择
+  const newDifficulty = post.difficulty === difficulty ? "" : difficulty;
+  try {
+    await axios.patch(
+      `http://localhost:5000/api/posts/${post._id}`,
+      { difficulty: newDifficulty },
+    );
+    // 更新本地数据
+    const idx = posts.value.findIndex((p) => p._id === post._id);
+    if (idx !== -1) {
+      posts.value[idx] = { ...posts.value[idx], difficulty: newDifficulty };
+    }
+  } catch (error) {
+    console.error("更新难度失败", error);
+  }
+};
+
+/**
+ * toggleSelect: 切换单篇文章的选中状态
+ *
+ * @param {string} id - 文章 _id
+ */
+const toggleSelect = (id) => {
+  const newSet = new Set(selectedPostIds.value);
+  if (newSet.has(id)) {
+    newSet.delete(id);
+  } else {
+    newSet.add(id);
+  }
+  selectedPostIds.value = newSet;
+};
+
+/**
+ * toggleSelectAll: 全选/取消全选
+ */
+const toggleSelectAll = () => {
+  if (isAllSelected.value) {
+    selectedPostIds.value = new Set();
+  } else {
+    selectedPostIds.value = new Set(filteredPosts.value.map((p) => p._id));
+  }
+};
+
+/**
+ * clearSelection: 清空所有选中
+ */
+const clearSelection = () => {
+  selectedPostIds.value = new Set();
+  showMoveModal.value = false;
+};
+
+/**
+ * confirmBatchDelete: 确认批量删除
+ */
+const confirmBatchDelete = () => {
+  if (selectedPostIds.value.size === 0) return;
+  isBatchDeleting.value = true;
+  postToDelete.value = null;
   deletePassword.value = "";
-
-  // 显示确认弹窗
   showDeleteModal.value = true;
 };
 
 /**
- * deletePost: 执行删除
+ * executeBatchMove: 执行批量移动分类
+ */
+const executeBatchMove = async () => {
+  const target = effectiveMoveCategory.value;
+  if (!target || selectedPostIds.value.size === 0) return;
+
+  moving.value = true;
+  const ids = Array.from(selectedPostIds.value);
+
+  try {
+    const res = await axios.post("http://localhost:5000/api/posts/batch-move", {
+      ids,
+      category: target,
+    });
+
+    // 更新本地文章列表的分类
+    posts.value = posts.value.map((p) => {
+      if (selectedPostIds.value.has(p._id)) {
+        return { ...p, category: target };
+      }
+      return p;
+    });
+
+    showMoveModal.value = false;
+    clearSelection();
+    alert(res.data.message || `成功移动到「${target}」`);
+    // 刷新分类列表
+    fetchCategories();
+  } catch (error) {
+    alert("移动失败: " + (error.response?.data?.message || error.message));
+  } finally {
+    moving.value = false;
+  }
+};
+
+/**
+ * confirmDelete: 确认单篇删除
  *
- * 发送删除请求到后端
- * 删除成功后更新本地列表
+ * @param {Object} post - 要删除的文章对象
+ */
+const confirmDelete = (post) => {
+  isBatchDeleting.value = false;
+  postToDelete.value = post;
+  deletePassword.value = "";
+  showDeleteModal.value = true;
+};
+
+/**
+ * deletePost: 执行删除（支持单篇和批量）
  */
 const deletePost = async () => {
-  // 防御性检查
-  if (!postToDelete.value) return;
-
-  // 标记开始删除
   deleting.value = true;
 
   try {
-    /**
-     * axios.delete: 发送 DELETE 请求
-     *
-     * URL: /api/posts/:id
-     * :id 是动态参数，从 postToDelete.value._id 获取
-     *
-     * data 选项：发送请求体数据（密码）
-     * 注意：DELETE 请求通常用 data 发送 body
-     */
-    await axios.delete(
-      `http://localhost:5000/api/posts/${postToDelete.value._id}`,
-      {
-        data: { password: deletePassword.value },
-      },
-    );
+    if (isBatchDeleting.value) {
+      // 批量删除
+      const ids = Array.from(selectedPostIds.value);
+      await axios.post("http://localhost:5000/api/posts/batch-delete", {
+        ids,
+        password: deletePassword.value,
+      });
+      posts.value = posts.value.filter((p) => !selectedPostIds.value.has(p._id));
+      clearSelection();
+      alert(`成功删除 ${ids.length} 篇文章`);
+    } else {
+      // 单篇删除
+      if (!postToDelete.value) return;
+      await axios.delete(
+        `http://localhost:5000/api/posts/${postToDelete.value._id}`,
+        { data: { password: deletePassword.value } },
+      );
+      posts.value = posts.value.filter((p) => p._id !== postToDelete.value._id);
+      alert("删除成功");
+      postToDelete.value = null;
+    }
 
-    /**
-     * filter: 过滤数组
-     * 排除被删除的文章，返回新数组
-     *
-     * p._id !== postToDelete.value._id
-     * 只保留不等于被删除文章ID的元素
-     */
-    posts.value = posts.value.filter((p) => p._id !== postToDelete.value._id);
-
-    alert("删除成功");
-
-    // 关闭弹窗
     showDeleteModal.value = false;
-
-    // 清空删除目标
-    postToDelete.value = null;
   } catch (error) {
     alert("删除失败: " + (error.response?.data?.message || error.message));
   } finally {
-    // 重置删除状态
     deleting.value = false;
   }
 };
@@ -721,8 +1223,9 @@ const deletePost = async () => {
  * 用途：初始化数据（如从API获取初始数据）
  */
 onMounted(() => {
-  // 组件加载时获取所有文章
+  // 组件加载时获取所有文章和分类
   fetchPosts();
+  fetchCategories();
 });
 </script>
 
@@ -818,19 +1321,78 @@ onMounted(() => {
   font-weight: 600;
 }
 
+/* ── 多选相关样式 ── */
+
+.select-all-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  user-select: none;
+}
+
+.checkbox-label input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--primary);
+  cursor: pointer;
+}
+
+.select-count {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
 .post-card {
   background: var(--card-bg);
   border-radius: 6px;
   overflow: hidden;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
   margin-bottom: 20px;
+  display: flex;
   transition:
     transform 0.3s,
-    box-shadow 0.3s;
+    box-shadow 0.3s,
+    border-color 0.2s;
+  border: 2px solid transparent;
 }
 .post-card:hover {
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+.post-card.is-selected {
+  border-color: var(--primary);
+  background: #f8fbf6;
+}
+
+.post-check-col {
+  display: flex;
+  align-items: flex-start;
+  padding: 20px 0 0 16px;
+  flex-shrink: 0;
+}
+
+.post-checkbox {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--primary);
+  cursor: pointer;
+}
+
+.post-content-col {
+  flex: 1;
+  min-width: 0;
 }
 
 .post-header {
@@ -841,26 +1403,119 @@ onMounted(() => {
   font-size: 22px;
   margin-bottom: 8px;
 }
+
+.title-link {
+  color: inherit;
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.title-link:hover {
+  color: var(--primary);
+}
 .post-meta {
   color: var(--text-secondary);
   font-size: 14px;
 }
 
 .post-body {
-  padding: 20px;
-  max-height: 200px;
-  overflow: hidden; /* 隐藏溢出内容 */
-  text-overflow: ellipsis;
-  color: var(--text);
+  display: none; /* 隐藏内容预览 */
 }
 
 .post-footer {
-  padding: 16px 20px;
+  padding: 14px 20px;
   background: #fafafa;
   display: flex;
   justify-content: space-between;
+  align-items: center;
   font-size: 14px;
   color: var(--text-secondary);
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.post-footer-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.post-category {
+  font-size: 13px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+/* ── 难度选择标签 ── */
+.difficulty-group {
+  display: flex;
+  gap: 4px;
+}
+
+.diff-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  opacity: 0.4;
+  transition: all 0.2s;
+  user-select: none;
+  line-height: 1.6;
+}
+
+.diff-badge:hover {
+  opacity: 0.8;
+  transform: scale(1.05);
+}
+
+.diff-badge.active {
+  opacity: 1;
+  font-weight: 600;
+  border-width: 1.5px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+}
+
+.diff-frequent {
+  color: #e74c3c;
+  border-color: #e74c3c;
+  background: #fef0ef;
+}
+.diff-frequent.active {
+  background: #e74c3c;
+  color: #fff;
+}
+
+.diff-common {
+  color: #e67e22;
+  border-color: #e67e22;
+  background: #fef5ed;
+}
+.diff-common.active {
+  background: #e67e22;
+  color: #fff;
+}
+
+.diff-occasional {
+  color: #27ae60;
+  border-color: #27ae60;
+  background: #edf9f1;
+}
+.diff-occasional.active {
+  background: #27ae60;
+  color: #fff;
+}
+
+.diff-rare {
+  color: #2980b9;
+  border-color: #2980b9;
+  background: #edf5fa;
+}
+.diff-rare.active {
+  background: #2980b9;
+  color: #fff;
 }
 
 .upload-btn {
@@ -995,12 +1650,221 @@ onMounted(() => {
   cursor: not-allowed;
 }
 
+/* ── 批量操作栏 ── */
+.batch-bar {
+  position: fixed;
+  bottom: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 24px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  z-index: 900;
+  animation: slideUp 0.25s ease;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+.batch-info {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.batch-delete-btn {
+  padding: 8px 20px;
+  background: #dc3545;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: opacity 0.2s;
+}
+
+.batch-delete-btn:hover {
+  opacity: 0.85;
+}
+
+.batch-move-btn {
+  padding: 8px 20px;
+  background: var(--primary);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: opacity 0.2s;
+}
+
+.batch-move-btn:hover {
+  opacity: 0.85;
+}
+
+.move-category-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.move-category-row .category-select,
+.move-category-row .category-input {
+  flex: 1;
+}
+
+.batch-cancel-btn {
+  padding: 8px 16px;
+  background: #f5f5f5;
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+
+.batch-cancel-btn:hover {
+  background: #eee;
+  color: var(--text);
+}
+
 .modal-body input[type="password"] {
   width: 100%;
   padding: 10px;
   border: 1px solid var(--border);
   border-radius: 4px;
   margin-top: 10px;
+}
+
+/* Upload Modal Enhancements */
+.upload-modal {
+  max-width: 560px;
+}
+
+.upload-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+  background: #fafafa;
+}
+
+.tab-btn {
+  flex: 1;
+  padding: 12px 16px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--text-secondary);
+  transition: all 0.2s;
+  border-bottom: 2px solid transparent;
+}
+
+.tab-btn:hover {
+  color: var(--text);
+  background: #f0f0f0;
+}
+
+.tab-btn.active {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+  font-weight: 600;
+  background: #fff;
+}
+
+.drop-zone {
+  border: 2px dashed var(--border);
+  border-radius: 8px;
+  padding: 40px 20px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s;
+  background: #fafaf8;
+}
+
+.drop-zone:hover,
+.drop-zone.drop-active {
+  border-color: var(--primary);
+  background: #f0f7f0;
+}
+
+.drop-zone.drop-active {
+  border-color: var(--primary);
+  background: #e8f5e8;
+  transform: scale(1.02);
+}
+
+.drop-icon {
+  color: var(--border);
+  margin-bottom: 12px;
+}
+
+.drop-zone:hover .drop-icon,
+.drop-zone.drop-active .drop-icon {
+  color: var(--primary);
+}
+
+.drop-text {
+  font-size: 15px;
+  color: var(--text);
+  margin-bottom: 8px;
+}
+
+.single-upload-form {
+  padding: 10px 0;
+}
+
+.form-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+
+.category-select-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.category-select {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 14px;
+  background: #fff;
+  color: var(--text);
+}
+
+.category-input {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 14px;
+  outline: none;
+}
+
+.category-input:focus,
+.category-select:focus {
+  border-color: var(--primary);
 }
 
 @media (max-width: 768px) {

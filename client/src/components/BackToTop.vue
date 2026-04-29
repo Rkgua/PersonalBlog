@@ -1,26 +1,39 @@
 <template>
-  <button v-show="isVisible" class="back-to-top" @click="scrollToTop">
+  <!-- 回到顶部 -->
+  <button v-show="showTop" class="float-btn float-top" @click="scrollToTop" title="回到顶部">
     <svg viewBox="0 0 24 24" width="24" height="24">
-      <path
-        fill="currentColor"
-        d="M7.41 15.41L12 10.83l4.59 4.58L18 14l-6-6-6 6z"
-      />
+      <path fill="currentColor" d="M7.41 15.41L12 10.83l4.59 4.58L18 14l-6-6-6 6z" />
+    </svg>
+  </button>
+  <!-- 回到底部 -->
+  <button v-show="showBottom" class="float-btn float-bottom" @click="scrollToBottom" title="回到底部">
+    <svg viewBox="0 0 24 24" width="24" height="24">
+      <path fill="currentColor" d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6z" />
     </svg>
   </button>
 </template>
-<!-- 回到顶部按钮 -->
-<script setup>
-import { ref, watch, onMounted, onUnmounted } from "vue";
 
-const isVisible = ref(false);
+<script setup>
+import { ref, onMounted, onUnmounted } from "vue";
+
+const showTop = ref(false);
+const showBottom = ref(false);
 const scrollThreshold = 300;
 
 const updateVisibility = () => {
-  isVisible.value = window.scrollY > scrollThreshold;
+  const scrollY = window.scrollY;
+  const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
+
+  showTop.value = scrollY > scrollThreshold;
+  showBottom.value = maxScroll > scrollThreshold && scrollY < maxScroll - scrollThreshold;
 };
 
 const scrollToTop = () => {
   window.scrollTo({ top: 0, behavior: "smooth" });
+};
+
+const scrollToBottom = () => {
+  window.scrollTo({ top: document.documentElement.scrollHeight, behavior: "smooth" });
 };
 
 onMounted(() => {
@@ -34,9 +47,8 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.back-to-top {
+.float-btn {
   position: fixed;
-  bottom: 30px;
   right: 30px;
   width: 50px;
   height: 50px;
@@ -55,7 +67,15 @@ onUnmounted(() => {
   z-index: 999;
 }
 
-.back-to-top:hover {
+.float-btn:hover {
   transform: scale(1.1);
+}
+
+.float-top {
+  bottom: 90px;
+}
+
+.float-bottom {
+  bottom: 30px;
 }
 </style>
