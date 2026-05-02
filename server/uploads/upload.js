@@ -17,7 +17,7 @@ const storage = multer.diskStorage({
     }
     cb(null, uploadDir);
   },
-  // ★★★ 关键修复：使用纯 ASCII 安全文件名，避免 multipart 中文编码乱码 ★★★
+  //关键修复：使用纯 ASCII 安全文件名，避免 multipart 中文编码乱码 
   // 浏览器发送 Content-Disposition filename 时中文会被 multer 用 Latin-1 解码
   // 从而导致 file.originalname 变为乱码（如 "笔记.md" → "ç¬è®°.md"）
   // 故 temp 文件名和标题都不得依赖 file.originalname，改用前端 JSON 传递
@@ -61,6 +61,14 @@ router.post("/", upload.array("files", 100), async (req, res) => {
       filenames = [];
     }
 
+    // 获取前端用 file.text() 读取的备用文件内容（JSON 文本字段，无编码问题）★★★
+    let contents = [];
+    try {
+      contents = JSON.parse(req.body.contents || "[]");
+    } catch (e) {
+      contents = [];
+    }
+
     const results = [];
     const errors = [];
 
@@ -68,26 +76,36 @@ router.post("/", upload.array("files", 100), async (req, res) => {
       // 每个文件独立 try-catch，防止一个文件失败拖垮整个导入
       try {
         const file = req.files[i];
-        // ★★★ 只用 JSON 传过来的文件名，永不使用 file.originalname ★★★
         const decodedName = safeFilename(filenames, i);
+        let skipReason = null;
 
-        // 不再检查 ext（前端已过滤），但保留做安全防护
+        // 检查扩展名（safeFilename 保证了 .md，但保留做安全防护）
         const ext = path.extname(decodedName).toLowerCase();
         if (ext !== ".md" && ext !== ".markdown") {
+          skipReason = "ext_not_md";
           try { fs.unlinkSync(file.path); } catch (_) {}
+          console.log(`[upload] SKIP[${i}] ${decodedName}: ext=${ext} (${skipReason})`);
           continue;
         }
 
-        // 检查文件大小，跳过空文件
-        if (file.size === 0) {
-          console.log("[upload] Skipping empty file (size=0):", decodedName);
-          try { fs.unlinkSync(file.path); } catch (_) {}
-          continue;
+        // 记录 contents[i] 的状态
+        const hasContents = !!(contents[i] && contents[i].trim());
+
+        // 内容获取策略：优先用前端 JSON 传递的内容（可靠）
+        let content = "";
+        if (hasContents) {
+          content = contents[i];
+        } else {
+          // fallback: 从 multer temp 文件读取
+          try {
+            content = fs.readFileSync(file.path, "utf-8") || "";
+          } catch (_) {
+            content = "";
+          }
         }
 
-        const content = fs.readFileSync(file.path, "utf-8");
         if (!content || !content.trim()) {
-          console.log("[upload] Skipping empty content:", decodedName);
+          try { const stat = fs.statSync(file.path); console.log(`[upload] SKIP[${i}] ${decodedName}: content_empty (hasContents=${hasContents}, file.size=${file.size}, tempFile.size=${stat.size})`); } catch (_) { console.log(`[upload] SKIP[${i}] ${decodedName}: content_empty (hasContents=${hasContents}, file.size=${file.size}, tempFile MISSING)`); }
           try { fs.unlinkSync(file.path); } catch (_) {}
           continue;
         }
@@ -96,7 +114,7 @@ router.post("/", upload.array("files", 100), async (req, res) => {
         const htmlContent = marked(content);
 
         if (!htmlContent) {
-          console.log("[upload] Skipping unparseable content:", decodedName);
+          console.log(`[upload] SKIP[${i}] ${decodedName}: marked_returned_falsy (content.length=${content.length})`);
           try { fs.unlinkSync(file.path); } catch (_) {}
           continue;
         }

@@ -127,7 +127,7 @@
         <input
           type="password"
           v-model="deletePassword"
-          placeholder="请输入密码（默认：123456）"
+          placeholder="请输入密码（123456）"
         />
       </div>
       <div class="modal-footer">
@@ -521,6 +521,7 @@ const closeUploadModal = () => {
   selectedFolderFiles.value = null;
   selectedFolderName.value = "";
   dragFilesCache = [];
+  dragTextsCache = [];
   dragFolderNameCache = "";
   singleFile.value = null;
   selectedCategoryForUpload.value = "未分类";
@@ -763,6 +764,7 @@ const fetchPosts = async () => {
 const handleFolderChange = (event) => {
   // 清除拖拽缓存（用户手动选择文件夹时以文件夹选择为准）
   dragFilesCache = [];
+  dragTextsCache = [];
   dragFolderNameCache = "";
   selectedFolderFiles.value = event.target.files;
   // 提取文件夹名作为显示名称
@@ -794,8 +796,13 @@ const handleDragOver = (e) => {
 /**
  * dragFilesCache: 拖拽文件缓存（绕过 DataTransfer 内容丢失 bug）
  * entry.file() 取出的 File 对象直接保存，不经过 new DataTransfer()
+ * 
+ * dragTextsCache: 与 dragFilesCache 一一对应的文件原始内容文本
+ * ★★★ 在 traverseEntry 中用 file.text() 一次性读好，uploadFolder 直接使用
+ *     不再在 uploadFolder 中二次 file.text()（new File() 构造的 File 在某些浏览器上 text() 可能返回空）
  */
 let dragFilesCache = [];
+let dragTextsCache = [];
 let dragFolderNameCache = "";
 
 /**
@@ -812,6 +819,7 @@ const handleDrop = (e) => {
   if (!items) return;
 
   dragFilesCache = [];
+  dragTextsCache = [];    // 重置内容文本缓存
   dragFolderNameCache = "";
   const promises = [];
   let topFolderName = "";
@@ -841,6 +849,10 @@ const handleDrop = (e) => {
 /**
  * traverseEntry: 递归遍历拖拽的文件目录树
  *
+ * ★★★ 关键修复：entry.file() 在某些浏览器上返回 File.size=0 且无实际内容，
+ * 导致拖拽上传大量文件失败。此处用 file.text() 主动读取内容，
+ * 然后用内容重新构造一个有真实数据的 File 对象。
+ *
  * @param {FileSystemEntry} entry
  * @param {Array} allFiles - 存储 File 对象的数组
  * @param {string} parentPath - 上级文件夹路径
@@ -850,18 +862,44 @@ const traverseEntry = (entry, allFiles, parentPath) => {
   return new Promise((resolve) => {
     if (entry.isFile) {
       entry.file((file) => {
-        // 仅添加 .md 文件（拖拽时直接过滤，不上传非 md 文件）
-        if (file.name.endsWith(".md") || file.name.endsWith(".markdown")) {
-          // 手动设置 webkitRelativePath 模拟文件输入行为
-          // 注意：entry.fullPath 包含完整路径如 /folder/sub/file.md
-          const fullPath = entry.fullPath || ("/" + parentPath + "/" + file.name).replace(/\/\//g, "/");
-          Object.defineProperty(file, "webkitRelativePath", {
-            value: fullPath.replace(/^\//, ""),
+        // 仅处理 .md 文件
+        if (!file.name.endsWith(".md") && !file.name.endsWith(".markdown")) {
+          resolve();
+          return;
+        }
+
+        const fullPath = entry.fullPath || ("/" + parentPath + "/" + file.name).replace(/\/\//g, "/");
+        const relPath = fullPath.replace(/^\//, "");
+
+        // ★★★ 用 file.text() 读取实际内容，绕过 entry.file() 返回空 File 的浏览器 bug ★★★
+        file.text().then((contentText) => {
+          if (!contentText || !contentText.trim()) {
+            console.warn("[upload] Skipping empty content (drag):", file.name);
+            resolve();
+            return;
+          }
+
+          // 用实际内容重新构造 File，确保 multipart 传输时有 size > 0
+          const properFile = new File([contentText], file.name, {
+            type: "text/markdown",
+            lastModified: file.lastModified || Date.now(),
+          });
+
+          // 手动设置 webkitRelativePath
+          Object.defineProperty(properFile, "webkitRelativePath", {
+            value: relPath,
             writable: false,
           });
-          allFiles.push(file);
-        }
-        resolve();
+
+          allFiles.push(properFile);
+          // ★★★ 把原始内容文本存到 dragTextsCache，uploadFolder 直接使用，不再二次 file.text() ★★★
+          dragTextsCache.push(contentText);
+          resolve();
+        }).catch(() => {
+          // text() 读取失败，放弃此文件
+          console.warn("[upload] Failed to read file content (drag):", file.name);
+          resolve();
+        });
       }, resolve); // 如果 file() 出错也 resolve 防止死锁
     } else if (entry.isDirectory) {
       const reader = entry.createReader();
@@ -892,13 +930,9 @@ const resolveFiles = () => {
   const useDrag = dragFilesCache.length > 0;
   const sourceFiles = useDrag ? dragFilesCache : Array.from(selectedFolderFiles.value || []);
 
-  // 过滤出 .md 文件（跳过 size=0 的空文件）
+  // 过滤出 .md 文件（交给后端做内容有效性检查，前端不做 size 过滤）
   const mdFiles = sourceFiles.filter((f) => {
     const name = f.name || "";
-    if (f.size === 0) {
-      console.warn("[upload] Skipping empty file (frontend):", name);
-      return false;
-    }
     return name.endsWith(".md") || name.endsWith(".markdown");
   });
 
@@ -955,28 +989,43 @@ const uploadFolder = async () => {
     return;
   }
 
-  const formData = new FormData();
-  formData.append("category", category);
-  // 发送预期文件数，后端可检测是否有文件丢失
-  formData.append("expectedCount", String(files.length));
-
-  // 只上传 .md 文件
-  for (const file of files) {
-    formData.append("files", file);
-  }
-  // 使用 JSON 数组传递文件名（避免 pipe 分隔符冲突）
-  formData.append("filenames", JSON.stringify(filenames));
-
   uploading.value = true;
 
   try {
-    // 注意：不要手动设置 Content-Type，axios 会自动添加 multipart boundary
+    const formData = new FormData();
+    formData.append("category", category);
+    formData.append("expectedCount", String(files.length));
+
+    for (const file of files) {
+      formData.append("files", file);
+    }
+    formData.append("filenames", JSON.stringify(filenames));
+
+    // ★★★ 使用 dragTextsCache（拖拽时已用 file.text() 读好的原始内容），
+    //     不再对 File 对象二次 file.text()（new File 在某些浏览器上 text() 可能返回空）
+    let contents;
+    if (useDrag && dragTextsCache.length >= files.length) {
+      contents = dragTextsCache.slice(0, files.length);
+    } else {
+      // fallback: 从文件夹选择器来的文件，用 File 对象的 text()
+      contents = await Promise.all(files.map((f) =>
+        f.text().catch(() => "")
+      ));
+    }
+    // 诊断
+    contents.forEach((c, i) => {
+      if (!c || !c.trim()) {
+        console.warn(`[upload] content empty [${i}]: "${filenames[i]}"`);
+      }
+    });
+    console.log(`[upload] Sending ${files.length} files, ${contents.filter(c => c && c.trim()).length} with content`);
+    formData.append("contents", JSON.stringify(contents));
+
     const res = await axios.post("http://localhost:5000/api/upload/", formData);
 
     const diag = res.data._diagnostics;
     const newPosts = res.data.posts || [];
 
-    // 检查文件数不匹配并警告
     if (diag) {
       console.log(`[upload] 期望 ${diag.expected} 个文件，服务端收到 ${diag.received}，成功导入 ${diag.imported}`);
       if (diag.received < diag.expected) {
@@ -992,6 +1041,7 @@ const uploadFolder = async () => {
       selectedFolderFiles.value = null;
       selectedFolderName.value = "";
       dragFilesCache = [];
+      dragTextsCache = [];
       dragFolderNameCache = "";
     }
   } catch (error) {
