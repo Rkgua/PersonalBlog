@@ -67,6 +67,12 @@
   > 删除密码在"server\routes\posts.js"使用了correctPassword可以自己修改
   > 数据库连接在"server\config\database.js",也可以基于自己的配置自己修改
 
+### 机器人智能问答
+
+![alt text](./readme-image/image-机器人问答.png)
+
+- 基于deepseek接口的智能问答,RAG（检索增强生成）先搜笔记，再让 AI 回答——答案基于你的数据来,如图
+
 ## 技术栈
 
 - **前端**: Vue 3 + Vite
