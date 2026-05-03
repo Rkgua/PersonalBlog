@@ -4,6 +4,7 @@
     @title-search: 监听NavBar组件发出的标题搜索事件
   -->
   <NavBar v-model="selectedCategory" @title-search="handleTitleSearch">
+    <!-- #action 具名插槽 -->
     <template #action>
       <button class="upload-btn" @click="showUploadModal = true">导入MD</button>
     </template>
@@ -575,7 +576,7 @@ const filteredPosts = computed(() => {
     result = result.filter((p) => p.category === selectedCategory.value);
   }
 
-  // 3. 按标题关键词模糊匹配（新增功能）
+  // 3. 按标题关键词模糊匹配
   if (titleSearchQuery.value) {
     /**
      * 模糊搜索实现：
@@ -600,11 +601,7 @@ const filteredPosts = computed(() => {
      *    - 标题或内容包含关键词都算匹配
      *    - 提供更广泛的搜索范围
      *
-     * 示例：
-     * - 搜索词: "vue"
-     * - 文章标题: "Vue3 入门教程"
-     * - "vue3 入门教程".toLowerCase() = "vue3 入门教程"
-     * - "vue3 入门教程".includes("vue") = true ✓
+     
      */
     const query = titleSearchQuery.value.toLowerCase();
     result = result.filter(
@@ -798,7 +795,7 @@ const handleDragOver = (e) => {
  * entry.file() 取出的 File 对象直接保存，不经过 new DataTransfer()
  * 
  * dragTextsCache: 与 dragFilesCache 一一对应的文件原始内容文本
- * ★★★ 在 traverseEntry 中用 file.text() 一次性读好，uploadFolder 直接使用
+ *  在 traverseEntry 中用 file.text() 一次性读好，uploadFolder 直接使用
  *     不再在 uploadFolder 中二次 file.text()（new File() 构造的 File 在某些浏览器上 text() 可能返回空）
  */
 let dragFilesCache = [];

@@ -1,3 +1,4 @@
+require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const connectDB = require("./config/database");
@@ -19,7 +20,8 @@ app.use("/uploads", express.static("uploads"));
 // 使用路由
 app.use("/api/posts", postRoutes);
 app.use("/api/upload", uploadRoutes);
-
+const qaRoutes = require("./routes/qa");
+app.use("/api/qa",qaRoutes);
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
