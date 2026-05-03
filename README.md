@@ -69,7 +69,7 @@
 
 ### 机器人智能问答
 
-![alt text](./readme-image/image-机器人问答.png)
+![alt text](./readme-image/image-机器人功能展示.png)
 
 - 基于deepseek接口的智能问答,RAG（检索增强生成）先搜笔记，再让 AI 回答——答案基于你的数据来,如图
 
