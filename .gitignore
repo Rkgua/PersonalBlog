@@ -3,6 +3,7 @@ node_modules/
 /.pnp
 .pnp.js
 .env
+! .env.example
 # 构建输出
 dist/
 dist-ssr/
