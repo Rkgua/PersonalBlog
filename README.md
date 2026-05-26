@@ -90,26 +90,53 @@
 ## 项目结构
 
 ```
-PersonalBlog/
-├── client/                 # Vue 前端
+PersonalNoteTable/
+├── client/                    # Vue 3 前端
 │   ├── src/
-│   │   ├── App.vue        # 主页面组件
-│   │   ├── main.js        # 入口文件
-│   │   └── style.css     # 全局样式
-│   ├── vite.config.js    # Vite 配置
+│   │   ├── assets/           # SVG 图标资源
+│   │   ├── components/
+│   │   │   ├── NavBar.vue    # 导航栏 + 设置面板
+│   │   │   ├── QApanel.vue   # AI 问答机器人
+│   │   │   └── BackToTop.vue # 回到顶部/底部
+│   │   ├── views/
+│   │   │   ├── Home.vue      # 首页（文章列表）
+│   │   │   ├── PostDetail.vue# 文章详情（康奈尔布局）
+│   │   │   └── NotFound.vue  # 404 页面
+│   │   ├── store/
+│   │   │   └── settings.js   # 设置状态（localStorage）
+│   │   ├── router/
+│   │   │   └── index.js      # 路由配置
+│   │   ├── App.vue
+│   │   ├── main.js
+│   │   └── style.css
+│   ├── index.html
+│   ├── vite.config.js
 │   └── package.json
 │
-└── server/                 # Express 后端
-    ├── config/
-    │   └── database.js   # MongoDB 连接配置
-    ├── models/
-    │   └── Post.js       # 文章数据模型
-    ├── routes/
-    │   └── posts.js      # 文章 API 路由
-    ├── uploads/
-    │   └── upload.js         # md文件上传
-    ├── index.js          # 服务入口
-    └── package.json
+├── server/                    # Express 后端
+│   ├── config/
+│   │   └── database.js       # MongoDB 连接配置
+│   ├── models/
+│   │   └── Post.js           # 文章数据模型
+│   ├── routes/
+│   │   ├── posts.js          # 文章 CRUD API
+│   │   └── qa.js             # AI 问答 API
+│   ├── uploads/
+│   │   └── upload.js         # md 文件导入（单文件/文件夹）
+│   ├── utils/
+│   │   ├── asyncHandler.js   # 异步错误捕获
+│   │   ├── AppError.js       # 自定义错误类
+│   │   └── errorHandler.js   # 全局错误中间件
+│   ├── index.js              # 服务入口
+│   ├── .env                  # 环境变量
+│   └── package.json
+│
+├── electron/                  # Electron 桌面壳
+│   ├── main.js               # 主进程（MongoMemoryServer + Express）
+│   └── preload.js            # 预加载脚本
+│
+├── package.json               # 根配置（Electron 打包脚本）
+└── README.md
 ```
 
 ## 启动步骤
