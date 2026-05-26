@@ -196,7 +196,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from "vue";
+import { ref, computed, watch } from "vue";
 import { useRoute } from "vue-router";
 import { settings, saveSettings, applyTheme, providerPresets, getEffectiveConfig } from "../store/settings";
 
@@ -431,6 +431,10 @@ function removeWebsite(index) {
 function closeSettings() {
   showSettings.value = false;
 }
+
+watch(showSettings, (val) => {
+  document.body.style.overflow = val ? "hidden" : "";
+});
 
 defineExpose({ titleSearchQuery, selectedCategory });
 </script>
