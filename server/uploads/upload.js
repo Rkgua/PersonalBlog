@@ -12,7 +12,7 @@ console.log("[upload] Upload route module loaded");
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const uploadDir = "uploads";
+    const uploadDir = process.env.UPLOAD_DIR || "uploads";
     if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir);
     cb(null, uploadDir);
   },

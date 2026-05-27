@@ -1,0 +1,65 @@
+{
+  "name": "personal-note-table",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Personal desktop technical note app (Vue 3 + Express + MongoDB + Electron)",
+  "main": "electron/main.js",
+  "scripts": {
+    "dev:client": "cd client && npm run dev",
+    "dev:electron": "electron . --dev",
+    "build:client": "cd client && npm run build",
+    "build": "npm run build:client",
+    "start": "electron .",
+    "pack": "electron-builder build --win",
+    "pack:mac": "electron-builder build --mac",
+    "pack:linux": "electron-builder build --linux"
+  },
+  "dependencies": {
+    "axios": "^1.16.0",
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
+    "marked": "^17.0.5",
+    "mongodb-memory-server": "^10.4.0",
+    "mongoose": "^9.3.3",
+    "multer": "^2.1.1"
+  },
+  "devDependencies": {
+    "electron": "^33.4.11",
+    "electron-builder": "^25.0.0"
+  },
+  "build": {
+    "appId": "com.rkgua.personal-note-table",
+    "productName": "PersonalNoteTable",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "electron/**/*",
+      "server/**/*",
+      "client/dist/**/*",
+      "package.json"
+    ],
+    "asarUnpack": [
+      "node_modules/mongodb-memory-server/**",
+      "node_modules/mongodb-memory-server-core/**"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": null
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "shortcutName": "PersonalNoteTable",
+      "createDesktopShortcut": true
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": null
+    },
+    "linux": {
+      "target": "AppImage",
+      "icon": null
+    }
+  }
+}
