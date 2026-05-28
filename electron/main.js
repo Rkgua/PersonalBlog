@@ -45,6 +45,36 @@ function createWindow(port) {
   });
 }
 
+function setupAutoUpdater() {
+  if (isDev) return;
+  const { autoUpdater } = require("electron-updater");
+  autoUpdater.logger = {
+    info: (m) => console.log("[update]", m),
+    warn: (m) => console.warn("[update]", m),
+    error: (m) => console.error("[update]", m),
+  };
+  autoUpdater.checkForUpdates();
+  autoUpdater.on("update-available", (info) => {
+    if (mainWindow) mainWindow.webContents.send("update-available", info);
+  });
+  autoUpdater.on("download-progress", (p) => {
+    if (mainWindow) mainWindow.webContents.send("download-progress", p);
+  });
+  autoUpdater.on("update-downloaded", (info) => {
+    if (mainWindow) mainWindow.webContents.send("update-downloaded", info);
+    dialog.showMessageBox(mainWindow, {
+      type: "info",
+      title: "更新已下载",
+      message: `版本 ${info.version} 已准备好，是否立即重启安装？`,
+      buttons: ["稍后重启", "立即重启"],
+      defaultId: 1,
+    }).then((r) => { if (r.response === 1) autoUpdater.quitAndInstall(); });
+  });
+  autoUpdater.on("error", (err) => {
+    console.error("[update]", err.message);
+  });
+}
+
 async function startApp() {
   try {
     if (!isDev) process.env.NODE_ENV = "production";
@@ -89,6 +119,7 @@ async function startApp() {
     const server = exp.listen(port, () => {
       const actualPort = server.address().port;
       createWindow(actualPort);
+      setupAutoUpdater();
     });
   } catch (err) {
     dialog.showErrorBox("启动失败", err.stack || err.message);
