@@ -730,9 +730,9 @@ const fetchPosts = async () => {
      * - async 函数中才能使用 await
      * - 会暂停函数执行直到 Promise resolve
      *
-     * 完整URL: http://localhost:5000/api/posts
+     * 完整URL: /api/posts
      */
-    const res = await axios.get("http://localhost:5000/api/posts");
+    const res = await axios.get("/api/posts");
 
     /**
      * res.data: axios 响应的数据部分
@@ -1020,7 +1020,7 @@ const uploadFolder = async () => {
     console.log(`[upload] Sending ${files.length} files, ${contents.filter(c => c && c.trim()).length} with content`);
     formData.append("contents", JSON.stringify(contents));
 
-    const res = await axios.post("http://localhost:5000/api/upload/", formData);
+    const res = await axios.post("/api/upload/", formData);
 
     const diag = res.data._diagnostics;
     const newPosts = res.data.posts || [];
@@ -1070,7 +1070,7 @@ const uploadSingleFile = async () => {
 
   try {
     // 注意：不要手动设置 Content-Type，axios 会自动添加 multipart boundary
-    const res = await axios.post("http://localhost:5000/api/upload/single", formData);
+    const res = await axios.post("/api/upload/single", formData);
 
     if (res.data.post) {
       posts.value = [res.data.post, ...posts.value];
@@ -1092,7 +1092,7 @@ const uploadSingleFile = async () => {
  */
 const fetchCategories = async () => {
   try {
-    const res = await axios.get("http://localhost:5000/api/posts/categories");
+    const res = await axios.get("/api/posts/categories");
     existingCategories.value = res.data || [];
   } catch (error) {
     console.error("获取分类失败", error);
@@ -1121,7 +1121,7 @@ const updateDifficulty = async (post, difficulty) => {
   const newDifficulty = post.difficulty === difficulty ? "" : difficulty;
   try {
     await axios.patch(
-      `http://localhost:5000/api/posts/${post._id}`,
+      `/api/posts/${post._id}`,
       { difficulty: newDifficulty },
     );
     // 更新本地数据
@@ -1190,7 +1190,7 @@ const executeBatchMove = async () => {
   const ids = Array.from(selectedPostIds.value);
 
   try {
-    const res = await axios.post("http://localhost:5000/api/posts/batch-move", {
+    const res = await axios.post("/api/posts/batch-move", {
       ids,
       category: target,
     });
@@ -1237,7 +1237,7 @@ const deletePost = async () => {
     if (isBatchDeleting.value) {
       // 批量删除
       const ids = Array.from(selectedPostIds.value);
-      await axios.post("http://localhost:5000/api/posts/batch-delete", {
+      await axios.post("/api/posts/batch-delete", {
         ids,
         password: deletePassword.value,
       });
@@ -1248,7 +1248,7 @@ const deletePost = async () => {
       // 单篇删除
       if (!postToDelete.value) return;
       await axios.delete(
-        `http://localhost:5000/api/posts/${postToDelete.value._id}`,
+        `/api/posts/${postToDelete.value._id}`,
         { data: { password: deletePassword.value } },
       );
       posts.value = posts.value.filter((p) => p._id !== postToDelete.value._id);

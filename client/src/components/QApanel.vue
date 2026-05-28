@@ -84,7 +84,7 @@ const ask = async () => {
 
   try {
     const cfg = getEffectiveConfig();
-    const res = await axios.post("http://localhost:5000/api/qa", {
+    const res = await axios.post("/api/qa", {
       question: q,
       apiKey: settings.deepseekKey,
       provider: settings.aiProvider,

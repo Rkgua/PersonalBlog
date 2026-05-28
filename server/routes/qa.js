@@ -18,13 +18,12 @@ function stripHtml(html) {
     .trim();
 }
 
-// POST /api/qa — 问答
 router.post("/", asyncHandler(async (req, res) => {
   const { question, apiKey, endpoint, model, providerType = "openai" } = req.body;
   if (!question) throw new AppError(400, "请输入问题");
   if (!apiKey) throw new AppError(400, "请先配置 API 密钥");
 
-  const Post = require("../models/Post");
+  const db = require("../models/database");
 
   const englishWords = question.match(/[a-zA-Z0-9_]+/g) || [];
   const chineseChars = question.match(/[\u4e00-\u9fff]+/g) || [];
@@ -43,17 +42,19 @@ router.post("/", asyncHandler(async (req, res) => {
 
   const searchConditions = searchTerms.map((kw) => ({
     $or: [
-      { title: { $regex: kw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), $options: "i" } },
-      { category: { $regex: kw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), $options: "i" } },
-      { content: { $regex: kw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), $options: "i" } },
+      { title: { $regex: new RegExp(kw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i") } },
+      { category: { $regex: new RegExp(kw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i") } },
+      { content: { $regex: new RegExp(kw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i") } },
     ],
   }));
 
-  let posts = await Post.find({ $or: searchConditions }).limit(10);
+  let posts = await db.findAsync({ $or: searchConditions });
+  posts = posts.slice(0, 10);
 
   if (posts.length === 0) {
-    const allPosts = await Post.find({}).limit(100);
-    posts = allPosts
+    const allPosts = await db.findAsync({});
+    const limited = allPosts.slice(0, 100);
+    posts = limited
       .filter((p) => searchTerms.some((kw) => stripHtml(p.content).includes(kw)))
       .slice(0, 10);
   }
@@ -80,7 +81,6 @@ ${context}`
   let answer;
 
   if (providerType === "anthropic") {
-    // Anthropic Claude format
     const cliRes = await axios.post(
       endpoint,
       {
@@ -99,7 +99,6 @@ ${context}`
     );
     answer = cliRes.data.content?.[0]?.text || "";
   } else {
-    // OpenAI-compatible (DeepSeek, OpenAI, Groq, Together AI, etc.)
     const openaiRes = await axios.post(
       endpoint,
       {
@@ -124,18 +123,18 @@ ${context}`
   res.json({ answer });
 }));
 
-// GET /api/qa/check — 诊断接口
 router.get("/check", asyncHandler(async (req, res) => {
   const { word } = req.query;
   if (!word) return res.json({ found: false, message: "请提供 word 参数" });
 
-  const Post = require("../models/Post");
+  const db = require("../models/database");
 
-  const [titleMatch, contentMatch, categoryMatch] = await Promise.all([
-    Post.countDocuments({ title: { $regex: word, $options: "i" } }),
-    Post.countDocuments({ content: { $regex: word, $options: "i" } }),
-    Post.countDocuments({ category: { $regex: word, $options: "i" } }),
-  ]);
+  const regex = new RegExp(word, "i");
+  const allPosts = await db.findAsync({});
+
+  const titleMatch = allPosts.filter((p) => regex.test(p.title)).length;
+  const contentMatch = allPosts.filter((p) => regex.test(p.content)).length;
+  const categoryMatch = allPosts.filter((p) => regex.test(p.category)).length;
 
   res.json({
     word,

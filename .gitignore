@@ -8,7 +8,8 @@ node_modules/
 dist/
 dist-ssr/
 *.local
-
+release
+server/data/
 # 编辑器
 .vscode/*
 !.vscode/extensions.json
@@ -25,3 +26,4 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
+.log

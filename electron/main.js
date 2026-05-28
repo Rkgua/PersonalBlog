@@ -1,15 +1,22 @@
-const { app, BrowserWindow } = require("electron");
+const { app, BrowserWindow, dialog } = require("electron");
 const path = require("path");
 const fs = require("fs");
-const { MongoMemoryServer } = require("mongodb-memory-server");
-const mongoose = require("mongoose");
 const express = require("express");
 const cors = require("cors");
 
 const isDev = process.env.NODE_ENV === "development" || process.argv.includes("--dev");
 
+process.on("uncaughtException", (err) => {
+  dialog.showErrorBox("启动失败", err.stack || err.message);
+  app.quit();
+});
+
+process.on("unhandledRejection", (err) => {
+  dialog.showErrorBox("启动失败", err.stack || err.message);
+  app.quit();
+});
+
 let mainWindow = null;
-let mongoServer = null;
 
 function createWindow(port) {
   mainWindow = new BrowserWindow({
@@ -40,47 +47,33 @@ function createWindow(port) {
 
 async function startApp() {
   try {
-    // 1. Persistent MongoDB via MongoMemoryServer
-    const dbPath = path.join(app.getPath("userData"), "mongodb-data");
-    fs.mkdirSync(dbPath, { recursive: true });
-
-    mongoServer = await MongoMemoryServer.create({
-      instance: { dbPath, storageEngine: "wiredTiger" },
-    });
-    const mongoUri = mongoServer.getUri();
-    console.log(`[electron] MongoDB: ${mongoUri}`);
-
-    process.env.MONGO_URI = mongoUri;
     if (!isDev) process.env.NODE_ENV = "production";
 
-    // 2. Connect Mongoose
-    const connectDB = require("../server/config/database");
-    await connectDB();
+    const userDataDir = app.getPath("userData");
+    process.env.USER_DATA_DIR = userDataDir;
+    fs.mkdirSync(path.join(userDataDir, "data"), { recursive: true });
 
-    // 3. Express server
+    require("../server/models/database");
+
     const exp = express();
     exp.use(cors());
     exp.use(express.json({ limit: "50mb" }));
 
-    // Upload temp directory (outside ASAR)
-    const uploadDir = path.join(app.getPath("userData"), "uploads");
+    const uploadDir = path.join(userDataDir, "uploads");
     process.env.UPLOAD_DIR = uploadDir;
     fs.mkdirSync(uploadDir, { recursive: true });
 
-    // Serve uploads (images/files that might be referenced from notes)
     exp.use("/uploads", express.static(uploadDir));
 
-    // API routes
     exp.use("/api/posts", require("../server/routes/posts"));
     exp.use("/api/upload", require("../server/uploads/upload"));
     exp.use("/api/qa", require("../server/routes/qa"));
 
-    // Serve built frontend
     if (!isDev) {
       const clientDist = path.join(__dirname, "..", "client", "dist");
       if (fs.existsSync(clientDist)) {
         exp.use(express.static(clientDist));
-        exp.get("*", (req, res, next) => {
+        exp.use((req, res, next) => {
           if (!req.path.startsWith("/api")) {
             res.sendFile(path.join(clientDist, "index.html"));
           } else {
@@ -92,28 +85,23 @@ async function startApp() {
 
     exp.use(require("../server/utils/errorHandler"));
 
-    // 4. Start listening
     const port = isDev ? 5000 : 0;
     const server = exp.listen(port, () => {
       const actualPort = server.address().port;
-      console.log(`[electron] Express on port ${actualPort}`);
       createWindow(actualPort);
     });
   } catch (err) {
-    console.error("[electron] Failed to start:", err);
+    dialog.showErrorBox("启动失败", err.stack || err.message);
     app.quit();
   }
 }
 
 app.whenReady().then(startApp);
 
-app.on("window-all-closed", async () => {
-  if (mongoServer) await mongoServer.stop();
+app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();
 });
 
 app.on("activate", () => {
-  if (!mainWindow) {
-    startApp();
-  }
+  if (!mainWindow) startApp();
 });

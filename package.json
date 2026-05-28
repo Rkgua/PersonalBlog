@@ -2,8 +2,9 @@
   "name": "personal-note-table",
   "version": "1.0.0",
   "private": true,
-  "description": "Personal desktop technical note app (Vue 3 + Express + MongoDB + Electron)",
+  "description": "Personal desktop technical note app (Vue 3 + Express + nedb + Electron)",
   "main": "electron/main.js",
+  "author": "Rkgua",
   "scripts": {
     "dev:client": "cd client && npm run dev",
     "dev:electron": "electron . --dev",
@@ -15,12 +16,11 @@
     "pack:linux": "electron-builder build --linux"
   },
   "dependencies": {
+    "@seald-io/nedb": "^4.1.2",
     "axios": "^1.16.0",
+    "call-bind-apply-helpers": "^1.0.2",
     "cors": "^2.8.6",
     "express": "^5.2.1",
-    "marked": "^17.0.5",
-    "mongodb-memory-server": "^10.4.0",
-    "mongoose": "^9.3.3",
     "multer": "^2.1.1"
   },
   "devDependencies": {
@@ -39,9 +39,30 @@
       "client/dist/**/*",
       "package.json"
     ],
-    "asarUnpack": [
-      "node_modules/mongodb-memory-server/**",
-      "node_modules/mongodb-memory-server-core/**"
+    "asar": false,
+    "asarUnpack": [],
+    "extraResources": [
+      {
+        "from": "node_modules",
+        "to": "app/node_modules",
+        "filter": [
+          "**/*",
+          "!electron/**",
+          "!7zip-bin/**",
+          "!app-builder-bin/**",
+          "!builder-util/**",
+          "!builder-util-runtime/**",
+          "!dmg-builder/**",
+          "!electron-builder/**",
+          "!electron-builder-squirrel-windows/**",
+          "!electron-publish/**",
+          "!electron-updater/**",
+          "!electron-rebuild/**",
+          "!@electron/**",
+          "!@malept/**",
+          "!@types/**"
+        ]
+      }
     ],
     "win": {
       "target": "nsis",

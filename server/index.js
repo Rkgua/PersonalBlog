@@ -2,7 +2,7 @@
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
-const connectDB = require("./config/database");
+require("./models/database");
 const postRoutes = require("./routes/posts");
 const uploadRoutes = require("./uploads/upload");
 
@@ -10,7 +10,6 @@ const app = express();
 const PORT = 5000;
 
 app.use(cors());
-connectDB();
 
 // 解析 JSON 请求体
 app.use(express.json());

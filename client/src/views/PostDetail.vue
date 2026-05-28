@@ -106,7 +106,7 @@ const scrollContainer = ref(null);
 const fetchPost = async () => {
   try {
     const res = await axios.get(
-      `http://localhost:5000/api/posts/${route.params.id}`,
+      `/api/posts/${route.params.id}`,
     );
     post.value = res.data;
     cueText.value = res.data.cue || "";
@@ -139,7 +139,7 @@ const saveCueSummary = async () => {
   saving.value = true;
   saveMsg.value = "";
   try {
-    await axios.patch(`http://localhost:5000/api/posts/${route.params.id}`, {
+    await axios.patch(`/api/posts/${route.params.id}`, {
       cue: cueText.value,
       summary: summaryText.value,
     });
