@@ -8,7 +8,7 @@ node_modules/
 dist/
 dist-ssr/
 *.local
-release
+release/win-unpacked/
 server/data/
 # 编辑器
 .vscode/*
