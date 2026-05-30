@@ -114,32 +114,42 @@
   <!-- 删除确认弹窗（支持单删和批量） -->
   <div
     v-if="showDeleteModal"
-    :key="'delete-' + postToDelete?._id"
+    :key="'delete-' + postToDelete?._id + '-' + deleteStep"
     class="modal-overlay"
     @click.self="showDeleteModal = false"
   >
     <div class="modal">
       <div class="modal-header">
-        <h3>确认删除</h3>
+        <h3>{{ deleteStep === "password" ? "输入密码" : "确认删除" }}</h3>
         <button class="close-btn" @click="showDeleteModal = false">×</button>
       </div>
       <div class="modal-body">
-        <p v-if="isBatchDeleting">确定要删除所选 <strong>{{ selectedPostIds.size }}</strong> 篇文章吗？此操作不可恢复。</p>
-        <p v-else>确定要删除文章 "{{ postToDelete?.title }}" 吗？</p>
-        <input
-          ref="deletePasswordInput"
-          type="password"
-          v-model="deletePassword"
-          placeholder="请输入密码（123456）"
-        />
+        <template v-if="deleteStep === 'password'">
+          <p v-if="isBatchDeleting">删除所选 <strong>{{ selectedPostIds.size }}</strong> 篇文章需要密码验证</p>
+          <p v-else>删除文章 "{{ postToDelete?.title }}" 需要密码验证</p>
+          <input
+            type="password"
+            v-model="deletePassword"
+            placeholder="请输入删除密码"
+            @keyup.enter="goToConfirm"
+          />
+        </template>
+        <template v-else>
+          <p v-if="isBatchDeleting">确定要删除所选 <strong>{{ selectedPostIds.size }}</strong> 篇文章吗？此操作不可恢复。</p>
+          <p v-else>确定要删除文章 "{{ postToDelete?.title }}" 吗？此操作不可恢复。</p>
+        </template>
       </div>
       <div class="modal-footer">
-        <button class="cancel-btn" @click="showDeleteModal = false">
-          取消
-        </button>
-        <button class="delete-btn" @click="deletePost" :disabled="deleting">
-          {{ deleting ? "删除中..." : "确认删除" }}
-        </button>
+        <template v-if="deleteStep === 'password'">
+          <button class="cancel-btn" @click="showDeleteModal = false">取消</button>
+          <button class="delete-btn" @click="goToConfirm">下一步</button>
+        </template>
+        <template v-else>
+          <button class="cancel-btn" @click="showDeleteModal = false">取消</button>
+          <button class="delete-btn" @click="deletePost" :disabled="deleting">
+            {{ deleting ? "删除中..." : "确认删除" }}
+          </button>
+        </template>
       </div>
     </div>
   </div>
@@ -321,6 +331,7 @@ import { useRoute, useRouter } from "vue-router";
  * 用于前端向后端发送异步请求
  */
 import axios from "axios";
+import { settings, saveSettings } from "../store/settings";
 
 /**
  * 导入子组件
@@ -456,6 +467,13 @@ const deletePassword = ref("");
  * 标记当前是否正在删除（用于禁用按钮）
  */
 const deleting = ref(false);
+
+/**
+ * deleteStep: 响应式字符串
+ * "password" - 输入密码阶段
+ * "confirm"  - 二次确认阶段
+ */
+const deleteStep = ref("password");
 
 /**
  * selectedPostIds: 响应式 Set
@@ -1177,7 +1195,22 @@ const confirmBatchDelete = () => {
   if (selectedPostIds.value.size === 0) return;
   isBatchDeleting.value = true;
   postToDelete.value = null;
+  if (!settings.deletePasswordEnabled) {
+    if (!confirm("确定要删除所选 " + selectedPostIds.value.size + " 篇文章吗？")) return;
+    deleting.value = true;
+    const ids = Array.from(selectedPostIds.value);
+    axios.post("/api/posts/batch-delete", { ids, password: settings.deletePassword })
+      .then(() => {
+        posts.value = posts.value.filter(p => !selectedPostIds.value.has(p._id));
+        clearSelection();
+        alert("成功删除 " + ids.length + " 篇文章");
+      })
+      .catch(err => alert("删除失败: " + (err.response?.data?.message || err.message)))
+      .finally(() => { deleting.value = false; });
+    return;
+  }
   deletePassword.value = "";
+  deleteStep.value = "password";
   showDeleteModal.value = true;
 };
 
@@ -1225,12 +1258,36 @@ const executeBatchMove = async () => {
 const confirmDelete = (post) => {
   isBatchDeleting.value = false;
   postToDelete.value = post;
+  if (!settings.deletePasswordEnabled) {
+    if (!confirm("确定要删除 \"" + post.title + "\" 吗？")) return;
+    deleting.value = true;
+    axios.delete("/api/posts/" + post._id, { data: { password: settings.deletePassword } })
+      .then(() => {
+        posts.value = posts.value.filter(p => p._id !== post._id);
+        alert("删除成功");
+      })
+      .catch(err => alert("删除失败: " + (err.response?.data?.message || err.message)))
+      .finally(() => { deleting.value = false; });
+    return;
+  }
   deletePassword.value = "";
+  deleteStep.value = "password";
   showDeleteModal.value = true;
   nextTick(() => {
     const el = document.querySelector(".modal-overlay input[type='password']");
     if (el) el.focus();
   });
+};
+
+/**
+ * goToConfirm: 验证密码后进入二次确认
+ */
+const goToConfirm = () => {
+  if (deletePassword.value !== settings.deletePassword) {
+    alert("密码错误");
+    return;
+  }
+  deleteStep.value = "confirm";
 };
 
 /**
@@ -1241,7 +1298,6 @@ const deletePost = async () => {
 
   try {
     if (isBatchDeleting.value) {
-      // 批量删除
       const ids = Array.from(selectedPostIds.value);
       await axios.post("/api/posts/batch-delete", {
         ids,
@@ -1251,7 +1307,6 @@ const deletePost = async () => {
       clearSelection();
       alert(`成功删除 ${ids.length} 篇文章`);
     } else {
-      // 单篇删除
       if (!postToDelete.value) return;
       await axios.delete(
         `/api/posts/${postToDelete.value._id}`,

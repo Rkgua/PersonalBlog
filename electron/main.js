@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog } = require("electron");
+const { app, BrowserWindow, dialog, Menu } = require("electron");
 const path = require("path");
 const fs = require("fs");
 const express = require("express");
@@ -17,6 +17,21 @@ process.on("unhandledRejection", (err) => {
 });
 
 let mainWindow = null;
+
+function setupMenu() {
+  const template = [
+    {
+      label: "PersonalNoteTable",
+      submenu: [
+        { role: "about", label: "关于" },
+        { type: "separator" },
+        { role: "quit", label: "退出" },
+      ],
+    },
+  ];
+  const menu = Menu.buildFromTemplate(template);
+  Menu.setApplicationMenu(menu);
+}
 
 function createWindow(port) {
   mainWindow = new BrowserWindow({
@@ -48,12 +63,22 @@ function createWindow(port) {
 function setupAutoUpdater() {
   if (isDev) return;
   const { autoUpdater } = require("electron-updater");
+  autoUpdater.autoDownload = false;
+  autoUpdater.autoInstallOnAppQuit = false;
+  autoUpdater.setFeedURL({
+    provider: "github",
+    owner: "Rkgua",
+    repo: "PersonalNoteTable",
+  });
   autoUpdater.logger = {
-    info: (m) => console.log("[update]", m),
-    warn: (m) => console.warn("[update]", m),
-    error: (m) => console.error("[update]", m),
+    info: () => {},
+    warn: () => {},
+    error: () => {},
   };
-  autoUpdater.checkForUpdates().catch(() => {});
+  // Delay update check to prioritize app startup
+  setTimeout(() => {
+    autoUpdater.checkForUpdates().catch(() => {});
+  }, 10000);
   autoUpdater.on("update-available", (info) => {
     if (mainWindow) mainWindow.webContents.send("update-available", info);
   });
@@ -70,9 +95,7 @@ function setupAutoUpdater() {
       defaultId: 1,
     }).then((r) => { if (r.response === 1) autoUpdater.quitAndInstall(); });
   });
-  autoUpdater.on("error", (err) => {
-    console.error("[update]", err.message);
-  });
+  autoUpdater.on("error", () => {});
 }
 
 async function startApp() {
@@ -119,6 +142,7 @@ async function startApp() {
     const server = exp.listen(port, () => {
       const actualPort = server.address().port;
       createWindow(actualPort);
+      setupMenu();
       setupAutoUpdater();
     });
   } catch (err) {

@@ -18,6 +18,8 @@ const defaults = {
   contentSize: "15px",
   handwritingFont: "'KaiTi', '楷体', serif",
   handwritingBg: "#fafaf5",
+  deletePasswordEnabled: true,
+  deletePassword: "123456",
   websites: [
     { title: "JS工具", url: "https://js-web-runner.mereith.com" },
     { title: "菜鸟教程", url: "https://www.runoob.com/" },

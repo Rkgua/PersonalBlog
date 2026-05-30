@@ -386,6 +386,31 @@
               </div>
             </div>
 
+            <!-- 删除保护 -->
+            <div class="settings-group">
+              <div class="settings-group-title">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                  <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1s3.1 1.39 3.1 3.1v2z"/>
+                </svg>
+                删除保护
+              </div>
+              <div class="settings-group-body">
+                <div class="setting-section">
+                  <div class="setting-row">
+                    <label>启用删除密码</label>
+                    <label class="toggle-switch">
+                      <input type="checkbox" v-model="settings.deletePasswordEnabled" @change="saveSettings" />
+                      <span class="toggle-slider"></span>
+                    </label>
+                  </div>
+                </div>
+                <div v-if="settings.deletePasswordEnabled" class="setting-section">
+                  <label>删除密码</label>
+                  <input class="form-input" v-model="deletePasswordInput" type="password" placeholder="设置删除密码" @change="onDeletePasswordChange" />
+                </div>
+              </div>
+            </div>
+
             <!-- 快捷网站 -->
             <div class="settings-group">
               <div class="settings-group-title">
@@ -608,6 +633,7 @@ const contentHex = ref(settings.contentColor);
 const handwritingHex = ref(settings.handwritingBg);
 const apiKeyInput = ref("");
 const apiKeyMsg = ref("");
+const deletePasswordInput = ref(settings.deletePassword);
 
 const providerList = Object.entries(providerPresets).map(([id, cfg]) => ({
   id,
@@ -776,6 +802,14 @@ function addWebsite() {
 function removeWebsite(index) {
   settings.websites.splice(index, 1);
   saveSettings();
+}
+
+function onDeletePasswordChange() {
+  const val = deletePasswordInput.value.trim();
+  if (val) {
+    settings.deletePassword = val;
+    saveSettings();
+  }
 }
 
 function resetDefaults() {
