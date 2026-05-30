@@ -53,7 +53,7 @@ function setupAutoUpdater() {
     warn: (m) => console.warn("[update]", m),
     error: (m) => console.error("[update]", m),
   };
-  autoUpdater.checkForUpdates();
+  autoUpdater.checkForUpdates().catch(() => {});
   autoUpdater.on("update-available", (info) => {
     if (mainWindow) mainWindow.webContents.send("update-available", info);
   });

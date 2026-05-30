@@ -5,37 +5,11 @@ const path = require("path");
 const asyncHandler = require("../utils/asyncHandler");
 const AppError = require("../utils/AppError");
 const db = require("../models/database");
+const MarkdownIt = require("markdown-it");
+const md = new MarkdownIt();
 
-function mdToHtml(md) {
-  if (!md) return "";
-  let lines = md.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").split("\n");
-  let html = [], i = 0, inCode = false, codeLang = "", codeLines = [], inList = false, listType = "";
-  function inline(s) {
-    return s.replace(/`([^`]+)`/g, "<code>$1</code>")
-            .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-            .replace(/\*(.+?)\*/g, "<em>$1</em>")
-            .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
-  }
-  while (i < lines.length) {
-    const raw = lines[i]; i++;
-    if (!inCode && raw.startsWith("```")) {
-      if (codeLines.length) { html.push("<pre><code" + (codeLang ? ' class="language-' + codeLang + '"' : "") + ">" + codeLines.join("\n") + "</code></pre>"); codeLines = []; codeLang = ""; }
-      inCode = !inCode;
-      if (inCode) codeLang = raw.slice(3).trim();
-      continue;
-    }
-    if (inCode) { codeLines.push(raw); continue; }
-    if (!raw.trim()) { if (inList) { html.push(listType === "ol" ? "</ol>" : "</ul>"); inList = false; } html.push(""); continue; }
-    const trimmed = raw.trim();
-    if (/^#{1,3}\s/.test(trimmed)) { if (inList) { html.push(listType === "ol" ? "</ol>" : "</ul>"); inList = false; } const level = trimmed.match(/^#+/)[0].length; html.push("<h" + level + ">" + inline(trimmed.slice(level + 1)) + "</h" + level + ">"); continue; }
-    if (/^\d+\.\s/.test(trimmed)) { if (!inList || listType !== "ol") { if (inList) html.push(listType === "ol" ? "</ol>" : "</ul>"); html.push("<ol>"); inList = true; listType = "ol"; } html.push("<li>" + inline(trimmed.replace(/^\d+\.\s*/, "")) + "</li>"); continue; }
-    if (/^[-*]\s/.test(trimmed)) { if (!inList || listType !== "ul") { if (inList) html.push(listType === "ol" ? "</ol>" : "</ul>"); html.push("<ul>"); inList = true; listType = "ul"; } html.push("<li>" + inline(trimmed.replace(/^[-*]\s*/, "")) + "</li>"); continue; }
-    if (inList) { html.push(listType === "ol" ? "</ol>" : "</ul>"); inList = false; }
-    html.push("<p>" + inline(trimmed) + "</p>");
-  }
-  if (codeLines.length) html.push("<pre><code" + (codeLang ? ' class="language-' + codeLang + '"' : "") + ">" + codeLines.join("\n") + "</code></pre>");
-  if (inList) html.push(listType === "ol" ? "</ol>" : "</ul>");
-  return html.join("\n");
+function mdToHtml(content) {
+  return md.render(content || "");
 }
 
 const router = express.Router();

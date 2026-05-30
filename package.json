@@ -23,6 +23,7 @@
     "cors": "^2.8.6",
     "electron-updater": "^6.8.3",
     "express": "^5.2.1",
+    "markdown-it": "^14.2.0",
     "multer": "^2.1.1"
   },
   "devDependencies": {
@@ -64,7 +65,9 @@
         ]
       }
     ],
-    "publish": ["github"],
+    "publish": [
+      "github"
+    ],
     "win": {
       "target": "nsis",
       "icon": null

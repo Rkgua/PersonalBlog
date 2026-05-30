@@ -428,6 +428,29 @@ onMounted(() => {
   color: var(--text-secondary);
 }
 
+.note-content table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 16px 0;
+  font-size: 0.95em;
+}
+
+.note-content th,
+.note-content td {
+  border: 1px solid #d0d0d0;
+  padding: 8px 12px;
+  text-align: left;
+}
+
+.note-content th {
+  background: #f0f0f0;
+  font-weight: 600;
+}
+
+.note-content tr:nth-child(even) {
+  background: #fafafa;
+}
+
 /* Summary Section */
 .cornell-summary {
   background: var(--card-bg);

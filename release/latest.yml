@@ -1,8 +1,8 @@
 version: 1.0.0
 files:
   - url: PersonalNoteTable-Setup-1.0.0.exe
-    sha512: AAx7FWC/j8Z9JkgaH4sS52TwdleoMkA/2JD38U+++GXQ+PTSN+2nSaVmBQsh2USST9TlsZoJPpgz3TpTJzPmHA==
-    size: 95291361
+    sha512: 3wgLX1At/xUGCvhB4SoEEyH98oo26BDoR6pO6cIb5RSB+a2JSPYD0wk9i//GnzkeQmrwwn1sYGNqSZaj34XNZg==
+    size: 95650284
 path: PersonalNoteTable-Setup-1.0.0.exe
-sha512: AAx7FWC/j8Z9JkgaH4sS52TwdleoMkA/2JD38U+++GXQ+PTSN+2nSaVmBQsh2USST9TlsZoJPpgz3TpTJzPmHA==
-releaseDate: '2026-05-28T07:05:25.566Z'
+sha512: 3wgLX1At/xUGCvhB4SoEEyH98oo26BDoR6pO6cIb5RSB+a2JSPYD0wk9i//GnzkeQmrwwn1sYGNqSZaj34XNZg==
+releaseDate: '2026-05-30T12:11:19.349Z'

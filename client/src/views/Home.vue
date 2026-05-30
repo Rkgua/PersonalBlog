@@ -114,6 +114,7 @@
   <!-- 删除确认弹窗（支持单删和批量） -->
   <div
     v-if="showDeleteModal"
+    :key="'delete-' + postToDelete?._id"
     class="modal-overlay"
     @click.self="showDeleteModal = false"
   >
@@ -126,6 +127,7 @@
         <p v-if="isBatchDeleting">确定要删除所选 <strong>{{ selectedPostIds.size }}</strong> 篇文章吗？此操作不可恢复。</p>
         <p v-else>确定要删除文章 "{{ postToDelete?.title }}" 吗？</p>
         <input
+          ref="deletePasswordInput"
           type="password"
           v-model="deletePassword"
           placeholder="请输入密码（123456）"
@@ -305,7 +307,7 @@
  * onMounted: 组件挂载完成的生命周期钩子
  * watch: 监听响应式数据变化
  */
-import { ref, computed, onMounted, watch } from "vue";
+import { ref, computed, onMounted, watch, nextTick } from "vue";
 
 /**
  * Vue Router 钩子
@@ -1225,6 +1227,10 @@ const confirmDelete = (post) => {
   postToDelete.value = post;
   deletePassword.value = "";
   showDeleteModal.value = true;
+  nextTick(() => {
+    const el = document.querySelector(".modal-overlay input[type='password']");
+    if (el) el.focus();
+  });
 };
 
 /**
