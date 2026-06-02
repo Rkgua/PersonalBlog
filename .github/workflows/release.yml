@@ -100,4 +100,6 @@ jobs:
           tag_name: ${{ steps.version.outputs.tag }}
           name: ${{ steps.version.outputs.tag }}
           generate_release_notes: true
-          files: installer-*/meta-*/
+          files: |
+            installer-*/*
+            meta-*/*
