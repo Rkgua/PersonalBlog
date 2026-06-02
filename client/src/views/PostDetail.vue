@@ -1,9 +1,5 @@
 <template>
-  <NavBar>
-    <template #action>
-      <button class="back-btn" @click="$router.back()">返回</button>
-    </template>
-  </NavBar>
+  <NavBar simple homeLabel="返回" />
 
   <div v-if="post" class="cornell-root">
     <!-- 顶部 -->
@@ -105,9 +101,7 @@ const scrollContainer = ref(null);
 
 const fetchPost = async () => {
   try {
-    const res = await axios.get(
-      `/api/posts/${route.params.id}`,
-    );
+    const res = await axios.get(`/api/posts/${route.params.id}`);
     post.value = res.data;
     cueText.value = res.data.cue || "";
     summaryText.value = res.data.summary || "";
@@ -547,6 +541,21 @@ onMounted(() => {
 }
 
 .back-btn:hover {
+  opacity: 0.8;
+}
+
+.post-back-btn {
+  padding: 6px 14px;
+  background: var(--primary);
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.post-back-btn:hover {
   opacity: 0.8;
 }
 
