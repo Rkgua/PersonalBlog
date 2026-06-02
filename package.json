@@ -1,6 +1,6 @@
 {
   "name": "personal-note-table",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "description": "Personal desktop technical note app (Vue 3 + Express + nedb + Electron)",
   "main": "electron/main.js",
