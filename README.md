@@ -1,12 +1,15 @@
 # 个人桌面技术博客
 
-- 个人技术博客项目 Vue3+node.js+MongoDB 小白原创项目
+- 个人技术博客项目 Vue3+node.js+nedb(纯 JavaScript 嵌入式文件数据库) 小白原创项目
 
 ---
 
+已有windows发行版本 (保留后点击仍然保留)
+
 灵感来源:问AI技术问题后复盘困难,感觉编译器或者IDE都不好用,所以想自己写一个笔记管理工具
 
-一个基于本地MongoDB数据库笔记管理,支持从桌面传入你的md文档笔记展示方便个人复习
+一个基于nedb(纯 JavaScript 嵌入式文件数据库)数据库笔记管理,支持从桌面传入你的md文档笔记展示方便个人复习
+(前MongoDB数据库版本已弃用)
 
 - 也支持按标题模糊查找你的笔记
 - 可以在nar的中添加个人的常用网站,我这添加了菜鸟教程和js编译台
@@ -84,63 +87,5 @@
 
 - **前端**: Vue 3 + Vite
 - **后端**: Node.js + Express
-- **数据库**: MongoDB
+- **数据库**:nedb(纯 JavaScript 嵌入式文件数据库)
 - **HTTP客户端**: Axios
-
-## 项目结构
-
-```
-PersonalNoteTable/
-├── client/                    # Vue 3 前端
-│   ├── src/
-│   │   ├── assets/           # SVG 图标资源
-│   │   ├── components/
-│   │   │   ├── NavBar.vue    # 导航栏 + 设置面板
-│   │   │   ├── QApanel.vue   # AI 问答机器人
-│   │   │   └── BackToTop.vue # 回到顶部/底部
-│   │   ├── views/
-│   │   │   ├── Home.vue      # 首页（文章列表）
-│   │   │   ├── PostDetail.vue# 文章详情（康奈尔布局）
-│   │   │   └── NotFound.vue  # 404 页面
-│   │   ├── store/
-│   │   │   └── settings.js   # 设置状态（localStorage）
-│   │   ├── router/
-│   │   │   └── index.js      # 路由配置
-│   │   ├── App.vue
-│   │   ├── main.js
-│   │   └── style.css
-│   ├── index.html
-│   ├── vite.config.js
-│   └── package.json
-│
-├── server/                    # Express 后端
-│   ├── config/
-│   │   └── database.js       # MongoDB 连接配置
-│   ├── models/
-│   │   └── Post.js           # 文章数据模型
-│   ├── routes/
-│   │   ├── posts.js          # 文章 CRUD API
-│   │   └── qa.js             # AI 问答 API
-│   ├── uploads/
-│   │   └── upload.js         # md 文件导入（单文件/文件夹）
-│   ├── utils/
-│   │   ├── asyncHandler.js   # 异步错误捕获
-│   │   ├── AppError.js       # 自定义错误类
-│   │   └── errorHandler.js   # 全局错误中间件
-│   ├── index.js              # 服务入口
-│   ├── .env                  # 环境变量
-│   └── package.json
-│
-├── electron/                  # Electron 桌面壳
-│   ├── main.js               # 主进程（MongoMemoryServer + Express）
-│   └── preload.js            # 预加载脚本
-│
-├── package.json               # 根配置（Electron 打包脚本）
-└── README.md
-```
-
-## 启动步骤
-
-### 1. 启动 MongoDB 以及前后端
-
-- 如果有什么可以更方便的笔记管理建议也可以告诉我,欢迎留言
